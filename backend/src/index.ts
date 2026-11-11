@@ -1,4 +1,5 @@
 import authRoutes from "./routes/auth.js";
+import notesRoutes from "./routes/notes.js";
 import { prisma } from "./lib/prisma.js";
 import "dotenv/config";
 import express from "express";
@@ -10,6 +11,7 @@ app.use(helmet());
 app.use(cors({ origin: "http://localhost:3000" }));
 app.use(express.json());
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/notes", notesRoutes);
 
 app.get("/api/v1/health", (_req, res) => {
   res.json({ status: "ok", app: "Nalar" });
