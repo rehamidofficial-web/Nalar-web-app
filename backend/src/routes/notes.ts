@@ -10,6 +10,19 @@ router.use(requireAuth);
 
 const uuidSchema = z.string().uuid();
 
+// Aturan tag: array string, tiap tag trim & lowercase, 1-30 karakter, maks 10 tag, unik
+const tagsSchema = z
+  .array(
+    z
+      .string()
+      .trim()
+      .toLowerCase()
+      .min(1, "Tag minimal 1 karakter")
+      .max(30, "Tag maksimal 30 karakter")
+  )
+  .max(10, "Maksimal 10 tag")
+  .transform((tags) => [...new Set(tags)]);
+
 const createNoteSchema = z.object({
   title: z
     .string()
@@ -20,6 +33,7 @@ const createNoteSchema = z.object({
     .string()
     .trim()
     .min(1, "Isi catatan minimal 1 karakter"),
+  tags: tagsSchema.optional().default([]),
 });
 
 const updateNoteSchema = z
@@ -35,11 +49,15 @@ const updateNoteSchema = z
       .trim()
       .min(1, "Isi catatan minimal 1 karakter")
       .optional(),
+    tags: tagsSchema.optional(),
   })
   .refine(
-    (data) => data.title !== undefined || data.content !== undefined,
+    (data) =>
+      data.title !== undefined ||
+      data.content !== undefined ||
+      data.tags !== undefined,
     {
-      message: "Minimal salah satu dari title atau content harus diisi",
+      message: "Minimal salah satu field harus diisi untuk memperbarui catatan",
     }
   );
 
@@ -55,6 +73,7 @@ router.get("/", async (req, res) => {
       title: true,
       content: true,
       summary: true,
+      tags: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -64,6 +83,7 @@ router.get("/", async (req, res) => {
     id: note.id,
     title: note.title,
     summary: note.summary,
+    tags: note.tags,
     createdAt: note.createdAt,
     updatedAt: note.updatedAt,
     contentPreview: note.content.slice(0, 200),
@@ -101,6 +121,7 @@ router.get("/:id", async (req, res) => {
       title: true,
       content: true,
       summary: true,
+      tags: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -139,19 +160,21 @@ router.post("/", async (req, res) => {
   }
 
   const userId = req.userId!;
-  const { title, content } = parsed.data;
+  const { title, content, tags } = parsed.data;
 
   const note = await prisma.note.create({
     data: {
       userId,
       title,
       content,
+      tags,
     },
     select: {
       id: true,
       title: true,
       content: true,
       summary: true,
+      tags: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -208,12 +231,15 @@ router.patch("/:id", async (req, res) => {
   }
 
   // Siapkan data update tanpa properti undefined (karena exactOptionalPropertyTypes: true)
-  const dataToUpdate: { title?: string; content?: string } = {};
+  const dataToUpdate: { title?: string; content?: string; tags?: string[] } = {};
   if (parsedBody.data.title !== undefined) {
     dataToUpdate.title = parsedBody.data.title;
   }
   if (parsedBody.data.content !== undefined) {
     dataToUpdate.content = parsedBody.data.content;
+  }
+  if (parsedBody.data.tags !== undefined) {
+    dataToUpdate.tags = parsedBody.data.tags;
   }
 
   const updatedNote = await prisma.note.update({
@@ -224,6 +250,7 @@ router.patch("/:id", async (req, res) => {
       title: true,
       content: true,
       summary: true,
+      tags: true,
       createdAt: true,
       updatedAt: true,
     },

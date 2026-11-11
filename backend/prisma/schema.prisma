@@ -31,6 +31,7 @@ model Note {
   title     String   @db.VarChar(255)
   content   String
   summary   String?
+  tags      String[] @default([])
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
