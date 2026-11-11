@@ -9,7 +9,7 @@ import helmet from "helmet";
 const app = express();
 app.use(helmet());
 app.use(cors({ origin: "http://localhost:3000" }));
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/notes", notesRoutes);
 

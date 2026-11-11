@@ -3,6 +3,7 @@ const API_URL =
 
 export type ApiResult<T> = {
   ok: boolean;
+  status: number;
   message: string;
   data?: T;
   errors?: { field: string; message: string }[];
@@ -31,6 +32,7 @@ export async function apiFetch<T>(
     const json = await res.json();
     return {
       ok: res.ok,
+      status: res.status,
       message: json.message ?? "",
       data: json.data,
       errors: json.errors,
@@ -38,6 +40,7 @@ export async function apiFetch<T>(
   } catch {
     return {
       ok: false,
+      status: 0,
       message:
         "Tidak bisa terhubung ke server. Pastikan backend sedang menyala.",
     };

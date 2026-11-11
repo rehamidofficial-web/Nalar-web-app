@@ -8,7 +8,7 @@ const router = Router();
 // Semua route di file ini wajib login
 router.use(requireAuth);
 
-const uuidSchema = z.string().uuid();
+const uuidSchema = z.string().uuid("ID tidak valid");
 
 // Aturan tag: array string, tiap tag trim & lowercase, 1-30 karakter, maks 10 tag, unik
 const tagsSchema = z
@@ -27,12 +27,13 @@ const createNoteSchema = z.object({
   title: z
     .string()
     .trim()
-    .min(1, "Judul minimal 1 karakter")
+    .min(1, "Judul minimal 1 karakter dan tidak boleh hanya spasi")
     .max(255, "Judul maksimal 255 karakter"),
   content: z
     .string()
     .trim()
-    .min(1, "Isi catatan minimal 1 karakter"),
+    .min(1, "Isi catatan minimal 1 karakter dan tidak boleh hanya spasi")
+    .max(50000, "Isi catatan maksimal 50.000 karakter"),
   tags: tagsSchema.optional().default([]),
 });
 
@@ -41,13 +42,14 @@ const updateNoteSchema = z
     title: z
       .string()
       .trim()
-      .min(1, "Judul minimal 1 karakter")
+      .min(1, "Judul minimal 1 karakter dan tidak boleh hanya spasi")
       .max(255, "Judul maksimal 255 karakter")
       .optional(),
     content: z
       .string()
       .trim()
-      .min(1, "Isi catatan minimal 1 karakter")
+      .min(1, "Isi catatan minimal 1 karakter dan tidak boleh hanya spasi")
+      .max(50000, "Isi catatan maksimal 50.000 karakter")
       .optional(),
     tags: tagsSchema.optional(),
   })
@@ -61,43 +63,164 @@ const updateNoteSchema = z
     }
   );
 
-// 1. GET /api/v1/notes (Daftar catatan milik user)
-router.get("/", async (req, res) => {
-  const userId = req.userId!;
-
-  const notes = await prisma.note.findMany({
-    where: { userId },
-    orderBy: { updatedAt: "desc" },
-    select: {
-      id: true,
-      title: true,
-      content: true,
-      summary: true,
-      tags: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
-
-  const items = notes.map((note) => ({
-    id: note.id,
-    title: note.title,
-    summary: note.summary,
-    tags: note.tags,
-    createdAt: note.createdAt,
-    updatedAt: note.updatedAt,
-    contentPreview: note.content.slice(0, 200),
-  }));
-
-  res.json({
-    success: true,
-    message: "Daftar catatan berhasil diambil",
-    data: { items },
-  });
-  return;
+const getNotesQuerySchema = z.object({
+  page: z.coerce
+    .number()
+    .int("Page harus bilangan bulat")
+    .min(1, "Page minimal 1")
+    .default(1),
+  limit: z.coerce
+    .number()
+    .int("Limit harus bilangan bulat")
+    .min(1, "Limit minimal 1")
+    .max(50, "Limit maksimal 50")
+    .default(10),
+  search: z
+    .string()
+    .trim()
+    .max(100, "Search maksimal 100 karakter")
+    .optional(),
+  tag: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .optional(),
+  sort: z
+    .enum(["terbaru", "terlama", "judul"])
+    .default("terbaru"),
 });
 
-// 2. GET /api/v1/notes/:id (Detail catatan)
+// 1. GET /api/v1/notes/tags (WAJIB sebelum /:id)
+router.get("/tags", async (req, res) => {
+  const userId = req.userId!;
+
+  try {
+    const rows = await prisma.$queryRaw<{ tag: string; count: number }[]>`
+      SELECT t AS tag, COUNT(*)::int AS count
+      FROM notes, UNNEST(tags) AS t
+      WHERE user_id = ${userId}::uuid
+      GROUP BY t
+      ORDER BY count DESC, t ASC`;
+
+    res.json({
+      success: true,
+      message: "Daftar tag berhasil diambil",
+      data: { tags: rows },
+    });
+    return;
+  } catch (err) {
+    console.error("Error mengambil tags:", err);
+    res.status(500).json({
+      success: false,
+      message: "Gagal mengambil daftar tag",
+      errors: [],
+    });
+    return;
+  }
+});
+
+// 2. GET /api/v1/notes (Daftar catatan dengan pagination, filter, search, sort)
+router.get("/", async (req, res) => {
+  const parsedQuery = getNotesQuerySchema.safeParse(req.query);
+  if (!parsedQuery.success) {
+    res.status(422).json({
+      success: false,
+      message: "Parameter query tidak valid",
+      errors: parsedQuery.error.issues.map((i) => ({
+        field: i.path.join("."),
+        message: i.message,
+      })),
+    });
+    return;
+  }
+
+  const { page, limit, search, tag, sort } = parsedQuery.data;
+  const userId = req.userId!;
+
+  // Penyusunan where clause
+  const where: any = {
+    userId,
+  };
+
+  if (search && search.length > 0) {
+    where.OR = [
+      { title: { contains: search, mode: "insensitive" } },
+      { content: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  if (tag && tag.length > 0) {
+    where.tags = { has: tag };
+  }
+
+  // Penyusunan order by
+  let orderBy: any = { updatedAt: "desc" };
+  if (sort === "terlama") {
+    orderBy = { updatedAt: "asc" };
+  } else if (sort === "judul") {
+    orderBy = { title: "asc" };
+  }
+
+  const skip = (page - 1) * limit;
+
+  try {
+    const [total, notes] = await prisma.$transaction([
+      prisma.note.count({ where }),
+      prisma.note.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          summary: true,
+          tags: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    const items = notes.map((note) => ({
+      id: note.id,
+      title: note.title,
+      summary: note.summary,
+      tags: note.tags,
+      createdAt: note.createdAt,
+      updatedAt: note.updatedAt,
+      contentPreview: note.content.slice(0, 200),
+    }));
+
+    res.json({
+      success: true,
+      message: "Daftar catatan berhasil diambil",
+      data: {
+        items,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+        },
+      },
+    });
+    return;
+  } catch (err) {
+    console.error("Error mengambil daftar catatan:", err);
+    res.status(500).json({
+      success: false,
+      message: "Gagal mengambil daftar catatan",
+      errors: [],
+    });
+    return;
+  }
+});
+
+// 3. GET /api/v1/notes/:id (Detail catatan)
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
   const parsedId = uuidSchema.safeParse(id);
@@ -144,7 +267,7 @@ router.get("/:id", async (req, res) => {
   return;
 });
 
-// 3. POST /api/v1/notes (Buat catatan baru)
+// 4. POST /api/v1/notes (Buat catatan baru)
 router.post("/", async (req, res) => {
   const parsed = createNoteSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -188,7 +311,7 @@ router.post("/", async (req, res) => {
   return;
 });
 
-// 4. PATCH /api/v1/notes/:id (Update catatan)
+// 5. PATCH /api/v1/notes/:id (Update catatan)
 router.patch("/:id", async (req, res) => {
   const { id } = req.params;
   const parsedId = uuidSchema.safeParse(id);
@@ -230,7 +353,7 @@ router.patch("/:id", async (req, res) => {
     return;
   }
 
-  // Siapkan data update tanpa properti undefined (karena exactOptionalPropertyTypes: true)
+  // Siapkan data update tanpa properti undefined (exactOptionalPropertyTypes: true)
   const dataToUpdate: { title?: string; content?: string; tags?: string[] } = {};
   if (parsedBody.data.title !== undefined) {
     dataToUpdate.title = parsedBody.data.title;
@@ -264,7 +387,7 @@ router.patch("/:id", async (req, res) => {
   return;
 });
 
-// 5. DELETE /api/v1/notes/:id (Hapus catatan)
+// 6. DELETE /api/v1/notes/:id (Hapus catatan)
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
   const parsedId = uuidSchema.safeParse(id);
