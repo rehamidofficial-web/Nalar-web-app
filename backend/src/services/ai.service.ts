@@ -216,6 +216,7 @@ export interface CreateEmbeddingResult {
 
 /**
  * Membuat representasi vector embedding (1536 dimensi) dari teks masukan.
+ * Menggunakan OpenAI SDK (konsisten dengan generateText).
  */
 export async function createEmbedding(teks: string): Promise<CreateEmbeddingResult> {
   const model = process.env.OPENAI_EMBEDDING_MODEL;
@@ -227,46 +228,17 @@ export async function createEmbedding(teks: string): Promise<CreateEmbeddingResu
     );
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new AiError(
-      500,
-      "Layanan AI belum dikonfigurasi di server.",
-      "OPENAI_API_KEY belum disetel di file .env"
-    );
-  }
-
+  const client = getAiClient();
   const pemotongan = potongTeks(teks, MAKSIMAL_KARAKTER_EMBEDDING);
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:embedContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify({
-          content: { parts: [{ text: pemotongan.teks }] },
-          taskType: "RETRIEVAL_DOCUMENT",
-          outputDimensionality: EMBEDDING_DIMENSI,
-        }),
-        signal: AbortSignal.timeout(30000),
-      }
-    );
+    const response = await client.embeddings.create({
+      model,
+      input: pemotongan.teks,
+      dimensions: EMBEDDING_DIMENSI,
+    });
 
-    if (!response.ok) {
-      const error = new Error("Gemini embedding API request failed");
-      Object.assign(error, { status: response.status });
-      throw error;
-    }
-
-    const result = (await response.json()) as {
-      embedding?: { values?: unknown };
-      usageMetadata?: { promptTokenCount?: number };
-    };
-    const embeddingData = result.embedding?.values;
+    const embeddingData = response.data?.[0]?.embedding;
 
     if (
       !Array.isArray(embeddingData) ||
@@ -287,7 +259,7 @@ export async function createEmbedding(teks: string): Promise<CreateEmbeddingResu
       );
     }
 
-    const tokens = result.usageMetadata?.promptTokenCount ?? "?";
+    const tokens = response.usage?.prompt_tokens ?? "?";
     console.log(`[AI] embedding model=${model}, dimensi=${embeddingData.length}, token=${tokens}`);
 
     return {

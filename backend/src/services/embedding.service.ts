@@ -1,5 +1,6 @@
 import { AiError, createEmbedding } from "./ai.service.js";
 import { prisma } from "../lib/prisma.js";
+import { keTeksVektor } from "../lib/vektor.js";
 
 type NoteContent = {
   title: string;
@@ -16,7 +17,7 @@ export function buatTeksEmbedding(note: NoteContent): string {
 
 export async function simpanEmbeddingCatatan(note: NoteForEmbedding): Promise<void> {
   const { embedding, model } = await createEmbedding(buatTeksEmbedding(note));
-  const vektor = `[${embedding.join(",")}]`;
+  const vektor = keTeksVektor(embedding);
 
   await prisma.$executeRaw`
     INSERT INTO note_embeddings (note_id, embedding, model)

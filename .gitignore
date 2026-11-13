@@ -4,5 +4,5 @@ node_modules
 !backend/.env.example
 .next
 dist
-HANDOFF-*.md
+
 
