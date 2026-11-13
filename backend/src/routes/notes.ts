@@ -2,6 +2,10 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
+import {
+  hapusEmbeddingCatatan,
+  jalankanEmbeddingDiLatarBelakang,
+} from "../services/embedding.service.js";
 
 const router = Router();
 
@@ -330,6 +334,11 @@ router.post("/", async (req, res) => {
     message: "Catatan berhasil dibuat",
     data: note,
   });
+  void jalankanEmbeddingDiLatarBelakang({
+    id: note.id,
+    title: note.title,
+    content: note.content,
+  });
   return;
 });
 
@@ -391,6 +400,12 @@ router.patch("/:id", async (req, res) => {
     dataToUpdate.tags = parsedBody.data.tags;
   }
 
+  const isiEmbeddingBerubah =
+    (parsedBody.data.title !== undefined &&
+      parsedBody.data.title !== existingNote.title) ||
+    (parsedBody.data.content !== undefined &&
+      parsedBody.data.content !== existingNote.content);
+
   const updatedNote = await prisma.note.update({
     where: { id },
     data: dataToUpdate,
@@ -405,11 +420,22 @@ router.patch("/:id", async (req, res) => {
     },
   });
 
+  if (isiEmbeddingBerubah) {
+    await hapusEmbeddingCatatan(id);
+  }
+
   res.json({
     success: true,
     message: "Catatan berhasil diperbarui",
     data: updatedNote,
   });
+  if (isiEmbeddingBerubah) {
+    void jalankanEmbeddingDiLatarBelakang({
+      id: updatedNote.id,
+      title: updatedNote.title,
+      content: updatedNote.content,
+    });
+  }
   return;
 });
 
