@@ -15,6 +15,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Nalar",
   description: "Hubungkan Idemu. Temukan Pengetahuanmu.",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/site.webmanifest",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

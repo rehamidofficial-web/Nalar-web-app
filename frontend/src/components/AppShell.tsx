@@ -193,8 +193,8 @@ export function AppShell({ user, children }: AppShellProps) {
           {/* Logo Brand */}
           <div className="flex items-center gap-3 px-2 py-3 border-b border-slate-100">
             <Image
-              src="/logo-symbol.svg"
-              alt="Logo Nalar"
+              src="/simbol-64.png"
+              alt="Nalar"
               width={32}
               height={32}
               className="h-8 w-8"
@@ -278,8 +278,8 @@ export function AppShell({ user, children }: AppShellProps) {
       <header className="sticky top-0 z-30 flex min-h-[56px] items-center justify-between border-b border-slate-200 bg-white px-4 py-2.5 lg:hidden">
         <div className="flex items-center gap-2.5">
           <Image
-            src="/logo-symbol.svg"
-            alt="Logo Nalar"
+            src="/simbol-64.png"
+            alt="Nalar"
             width={28}
             height={28}
             className="h-7 w-7"

@@ -42,7 +42,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
         <div className="mb-6 flex flex-col items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-symbol.svg" alt="Nalar" className="h-16 w-16" />
+          <img src="/logo-lengkap.png" alt="Nalar" className="h-16 w-16" />
           <h1 className="mt-3 text-2xl font-bold">Buat akun Nalar</h1>
           <p className="text-sm text-slate-500">
             Mulai kumpulkan pengetahuanmu.
