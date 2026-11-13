@@ -7,6 +7,7 @@ import { useRequireAuth } from "@/lib/useRequireAuth";
 import { AppShell } from "@/components/AppShell";
 import { NoteEditor } from "@/components/NoteEditor";
 import { SummaryPanel } from "@/components/SummaryPanel";
+import { ConceptPanel, ConceptItem } from "@/components/ConceptPanel";
 import { apiFetch, pesanError } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 
@@ -16,6 +17,7 @@ interface NoteDetail {
   content: string;
   summary: string | null;
   tags?: string[];
+  concepts?: ConceptItem[];
   createdAt: string;
   updatedAt: string;
 }
@@ -130,6 +132,16 @@ function EditNoteContent() {
               isDirty={isDirty}
               onSummaryUpdated={(newSummary) => {
                 setNote((prev) => (prev ? { ...prev, summary: newSummary } : prev));
+              }}
+            />
+
+            {/* Panel Konsep Utama AI */}
+            <ConceptPanel
+              noteId={note.id}
+              concepts={note.concepts ?? []}
+              isDirty={isDirty}
+              onConceptsUpdated={(newConcepts) => {
+                setNote((prev) => (prev ? { ...prev, concepts: newConcepts } : prev));
               }}
             />
           </div>

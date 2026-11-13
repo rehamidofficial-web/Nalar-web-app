@@ -247,6 +247,22 @@ router.get("/:id", async (req, res) => {
       tags: true,
       createdAt: true,
       updatedAt: true,
+      noteConcepts: {
+        select: {
+          concept: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+            },
+          },
+        },
+        orderBy: {
+          concept: {
+            name: "asc",
+          },
+        },
+      },
     },
   });
 
@@ -259,10 +275,16 @@ router.get("/:id", async (req, res) => {
     return;
   }
 
+  const { noteConcepts, ...restNote } = note;
+  const concepts = noteConcepts.map((nc) => nc.concept);
+
   res.json({
     success: true,
     message: "Catatan berhasil diambil",
-    data: note,
+    data: {
+      ...restNote,
+      concepts,
+    },
   });
   return;
 });
@@ -422,6 +444,16 @@ router.delete("/:id", async (req, res) => {
 
   await prisma.note.delete({
     where: { id },
+  });
+
+  // Task 3.7: Bersihkan konsep yatim milik pengguna setelah catatan terhapus
+  await prisma.concept.deleteMany({
+    where: {
+      userId,
+      noteConcepts: {
+        none: {},
+      },
+    },
   });
 
   res.json({
