@@ -181,3 +181,25 @@ export async function generateText(
     );
   }
 }
+
+/**
+ * Helper untuk mengirim response error AI ke client Express.
+ */
+export function kirimErrorAi(res: any, err: any) {
+  if (err instanceof AiError) {
+    res.status(err.status).json({
+      success: false,
+      message: err.userMessage,
+      errors: [],
+    });
+    return;
+  }
+
+  res.status(502).json({
+    success: false,
+    message: "Terjadi kesalahan pada layanan AI.",
+    errors: [],
+  });
+  return;
+}
+

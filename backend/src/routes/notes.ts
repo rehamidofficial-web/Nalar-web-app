@@ -354,12 +354,16 @@ router.patch("/:id", async (req, res) => {
   }
 
   // Siapkan data update tanpa properti undefined (exactOptionalPropertyTypes: true)
-  const dataToUpdate: { title?: string; content?: string; tags?: string[] } = {};
+  const dataToUpdate: { title?: string; content?: string; tags?: string[]; summary?: string | null } = {};
   if (parsedBody.data.title !== undefined) {
     dataToUpdate.title = parsedBody.data.title;
   }
   if (parsedBody.data.content !== undefined) {
     dataToUpdate.content = parsedBody.data.content;
+    // Task 3.6: Jika content berubah, reset summary menjadi null
+    if (parsedBody.data.content !== existingNote.content) {
+      dataToUpdate.summary = null;
+    }
   }
   if (parsedBody.data.tags !== undefined) {
     dataToUpdate.tags = parsedBody.data.tags;

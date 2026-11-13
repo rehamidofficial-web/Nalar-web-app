@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useRequireAuth } from "@/lib/useRequireAuth";
 import { AppShell } from "@/components/AppShell";
 import { NoteEditor } from "@/components/NoteEditor";
+import { SummaryPanel } from "@/components/SummaryPanel";
 import { apiFetch, pesanError } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 
@@ -25,18 +26,19 @@ function EditNoteContent() {
   const id = typeof params?.id === "string" ? params.id : Array.isArray(params?.id) ? params.id[0] : "";
 
   const [note, setNote] = useState<NoteDetail | null>(null);
+  const [currentContent, setCurrentContent] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  useEffect(() => {
-    if (!user || !id) return;
-
+  const fetchNote = useCallback(() => {
+    if (!id) return;
     const token = getToken();
     apiFetch<NoteDetail>(`/notes/${id}`, { token })
       .then((res) => {
         if (res.ok && res.data) {
           setNote(res.data);
+          setCurrentContent(res.data.content);
         } else if (res.status === 404) {
           setNotFound(true);
         } else {
@@ -49,7 +51,12 @@ function EditNoteContent() {
       .finally(() => {
         setIsLoading(false);
       });
-  }, [user, id]);
+  }, [id]);
+
+  useEffect(() => {
+    if (!user || !id) return;
+    fetchNote();
+  }, [user, id, fetchNote]);
 
   if (!user) {
     return (
@@ -58,6 +65,8 @@ function EditNoteContent() {
       </div>
     );
   }
+
+  const isDirty = Boolean(note && currentContent !== note.content);
 
   return (
     <AppShell user={user}>
@@ -107,8 +116,22 @@ function EditNoteContent() {
                   content: note.content,
                   tags: note.tags ?? [],
                 }}
+                onContentChange={(newContent) => setCurrentContent(newContent)}
+                onSaveSuccess={() => {
+                  fetchNote();
+                }}
               />
             </div>
+
+            {/* Panel Ringkasan AI */}
+            <SummaryPanel
+              noteId={note.id}
+              summary={note.summary}
+              isDirty={isDirty}
+              onSummaryUpdated={(newSummary) => {
+                setNote((prev) => (prev ? { ...prev, summary: newSummary } : prev));
+              }}
+            />
           </div>
         ) : null}
       </div>

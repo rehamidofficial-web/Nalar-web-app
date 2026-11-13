@@ -13,9 +13,16 @@ interface NoteEditorProps {
     tags?: string[];
   };
   isEdit?: boolean;
+  onContentChange?: (currentContent: string) => void;
+  onSaveSuccess?: () => void;
 }
 
-export function NoteEditor({ initialData, isEdit = false }: NoteEditorProps) {
+export function NoteEditor({
+  initialData,
+  isEdit = false,
+  onContentChange,
+  onSaveSuccess,
+}: NoteEditorProps) {
   const router = useRouter();
 
   const [title, setTitle] = useState(initialData?.title ?? "");
@@ -102,7 +109,11 @@ export function NoteEditor({ initialData, isEdit = false }: NoteEditorProps) {
         });
 
         if (res.ok) {
-          router.push("/notes");
+          if (onSaveSuccess) {
+            onSaveSuccess();
+          } else {
+            router.push("/notes");
+          }
         } else {
           setErrorMessage(pesanError(res));
         }
@@ -118,7 +129,11 @@ export function NoteEditor({ initialData, isEdit = false }: NoteEditorProps) {
         });
 
         if (res.ok) {
-          router.push("/notes");
+          if (onSaveSuccess) {
+            onSaveSuccess();
+          } else {
+            router.push("/notes");
+          }
         } else {
           setErrorMessage(pesanError(res));
         }
@@ -220,7 +235,10 @@ export function NoteEditor({ initialData, isEdit = false }: NoteEditorProps) {
         <textarea
           id="content"
           value={content}
-          onChange={(e) => setContent(e.target.value)}
+          onChange={(e) => {
+            setContent(e.target.value);
+            onContentChange?.(e.target.value);
+          }}
           placeholder="Tuliskan isi catatanmu di sini..."
           rows={14}
           disabled={isSubmitting}
