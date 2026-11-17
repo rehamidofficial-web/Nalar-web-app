@@ -1,6 +1,7 @@
 import { AiError, createEmbedding } from "./ai.service.js";
 import { prisma } from "../lib/prisma.js";
 import { keTeksVektor } from "../lib/vektor.js";
+import { jalankanRelasiDiLatarBelakang } from "./relationship.service.js";
 
 type NoteContent = {
   title: string;
@@ -9,6 +10,7 @@ type NoteContent = {
 
 type NoteForEmbedding = NoteContent & {
   id: string;
+  userId?: string;
 };
 
 export function buatTeksEmbedding(note: NoteContent): string {
@@ -36,6 +38,20 @@ export async function jalankanEmbeddingDiLatarBelakang(
 ): Promise<void> {
   try {
     await simpanEmbeddingCatatan(note);
+
+    // Ambil userId jika belum ada di parameter note
+    let userId = note.userId;
+    if (!userId) {
+      const dbNote = await prisma.note.findUnique({
+        where: { id: note.id },
+        select: { userId: true },
+      });
+      userId = dbNote?.userId;
+    }
+
+    if (userId) {
+      void jalankanRelasiDiLatarBelakang(userId, note.id);
+    }
   } catch (error) {
     const message =
       error instanceof AiError

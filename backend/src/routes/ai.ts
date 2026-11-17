@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { generateText, kirimErrorAi } from "../services/ai.service.js";
 import { parseKonsep } from "../lib/parseKonsep.js";
+import { jalankanRelasiKonsepDiLatarBelakang } from "../services/relationship.service.js";
 
 const router = Router();
 
@@ -298,6 +299,9 @@ router.post("/extract-concepts", async (req, res) => {
         terpotong: aiResult.terpotong,
       },
     });
+
+    // Pemicu relasi konsep di latar belakang setelah respons dikirim
+    void jalankanRelasiKonsepDiLatarBelakang(userId, note.id);
     return;
   } catch (err: any) {
     kirimErrorAi(res, err);

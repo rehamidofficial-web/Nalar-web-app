@@ -6,6 +6,7 @@ import {
   hapusEmbeddingCatatan,
   jalankanEmbeddingDiLatarBelakang,
 } from "../services/embedding.service.js";
+import { hapusRelasiCatatan } from "../services/relationship.service.js";
 
 const router = Router();
 
@@ -338,6 +339,7 @@ router.post("/", async (req, res) => {
     id: note.id,
     title: note.title,
     content: note.content,
+    userId,
   });
   return;
 });
@@ -422,6 +424,7 @@ router.patch("/:id", async (req, res) => {
 
   if (isiEmbeddingBerubah) {
     await hapusEmbeddingCatatan(id);
+    await hapusRelasiCatatan(id);
   }
 
   res.json({
@@ -434,6 +437,7 @@ router.patch("/:id", async (req, res) => {
       id: updatedNote.id,
       title: updatedNote.title,
       content: updatedNote.content,
+      userId,
     });
   }
   return;
