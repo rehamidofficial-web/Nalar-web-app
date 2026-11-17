@@ -20,6 +20,14 @@ export interface GraphEdge {
   similarity: number | null;
 }
 
+export interface GraphLinkObject {
+  source: GraphNode | string;
+  target: GraphNode | string;
+  type: "similar" | "concept";
+  similarity: number | null;
+  [key: string]: unknown;
+}
+
 export interface GraphMeta {
   totalCatatan: number;
   jumlahNode: number;

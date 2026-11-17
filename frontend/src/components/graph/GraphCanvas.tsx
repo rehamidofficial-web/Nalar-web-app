@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
-import ForceGraph2D, { ForceGraphMethods } from "react-force-graph-2d";
+import ForceGraph2D, { ForceGraphMethods, NodeObject, LinkObject } from "react-force-graph-2d";
 import { GraphNode, GraphEdge } from "@/types/graph";
 import { GRAPH_THEME } from "@/lib/graphTheme";
 
@@ -25,7 +25,7 @@ export default function GraphCanvas({
   onFitGraphReady,
 }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const fgRef = useRef<ForceGraphMethods<any, any> | undefined>(undefined);
+  const fgRef = useRef<ForceGraphMethods<NodeObject<GraphNode>, LinkObject<GraphNode, GraphEdge>> | undefined>(undefined);
   const [dimensions, setDimensions] = useState({ width: 600, height: 500 });
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
@@ -119,7 +119,10 @@ export default function GraphCanvas({
 
   // Custom node canvas paint
   const paintNode = useCallback(
-    (node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+    (nodeObj: NodeObject<GraphNode>, ctx: CanvasRenderingContext2D, globalScale: number) => {
+      const node = nodeObj as GraphNode;
+      const nodeX = node.x ?? 0;
+      const nodeY = node.y ?? 0;
       const r = getNodeRadius(node);
       const isSelected = selectedNodeId === node.id;
       const isHovered = hoveredNodeId === node.id;
@@ -153,14 +156,14 @@ export default function GraphCanvas({
       // Gambar lingkaran luar jika dicari / dipilih
       if (isSearched || isSelected || isHovered) {
         ctx.beginPath();
-        ctx.arc(node.x, node.y, r + 3, 0, 2 * Math.PI, false);
+        ctx.arc(nodeX, nodeY, r + 3, 0, 2 * Math.PI, false);
         ctx.fillStyle = isSearched ? "rgba(245, 158, 11, 0.35)" : "rgba(225, 29, 72, 0.25)";
         ctx.fill();
       }
 
       // Gambar lingkaran node
       ctx.beginPath();
-      ctx.arc(node.x, node.y, r, 0, 2 * Math.PI, false);
+      ctx.arc(nodeX, nodeY, r, 0, 2 * Math.PI, false);
       ctx.fillStyle = fillColor;
       ctx.fill();
 
@@ -181,13 +184,13 @@ export default function GraphCanvas({
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
 
-        const textY = node.y + r + 3;
+        const textY = nodeY + r + 3;
 
         // Background label agar terbaca jelas
         const textWidth = ctx.measureText(label).width;
         ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
         ctx.fillRect(
-          node.x - textWidth / 2 - 2,
+          nodeX - textWidth / 2 - 2,
           textY - 1,
           textWidth + 4,
           fontSize + 2
@@ -197,7 +200,7 @@ export default function GraphCanvas({
           hoveredNodeId && !isHovered && !isNeighborOfHovered
             ? GRAPH_THEME.node.textDimmedColor
             : GRAPH_THEME.node.textColor;
-        ctx.fillText(label, node.x, textY);
+        ctx.fillText(label, nodeX, textY);
       }
     },
     [
@@ -212,9 +215,24 @@ export default function GraphCanvas({
 
   // Custom link canvas paint
   const paintLink = useCallback(
-    (link: any, ctx: CanvasRenderingContext2D) => {
-      const sourceId = typeof link.source === "object" ? link.source.id : link.source;
-      const targetId = typeof link.target === "object" ? link.target.id : link.target;
+    (linkObj: LinkObject<GraphNode, GraphEdge>, ctx: CanvasRenderingContext2D) => {
+      const link = linkObj as unknown as {
+        source: GraphNode | string;
+        target: GraphNode | string;
+        type: "similar" | "concept";
+        similarity: number | null;
+      };
+
+      const sourceNode = typeof link.source === "object" ? link.source : null;
+      const targetNode = typeof link.target === "object" ? link.target : null;
+
+      const sourceId = sourceNode ? sourceNode.id : (link.source as string);
+      const targetId = targetNode ? targetNode.id : (link.target as string);
+
+      const sourceX = sourceNode?.x ?? 0;
+      const sourceY = sourceNode?.y ?? 0;
+      const targetX = targetNode?.x ?? 0;
+      const targetY = targetNode?.y ?? 0;
 
       const isConnectedToHovered =
         hoveredNodeId && (sourceId === hoveredNodeId || targetId === hoveredNodeId);
@@ -247,8 +265,8 @@ export default function GraphCanvas({
 
       ctx.save();
       ctx.beginPath();
-      ctx.moveTo(link.source.x, link.source.y);
-      ctx.lineTo(link.target.x, link.target.y);
+      ctx.moveTo(sourceX, sourceY);
+      ctx.lineTo(targetX, targetY);
       ctx.strokeStyle = strokeColor;
       ctx.lineWidth = lineWidth;
 
@@ -272,17 +290,18 @@ export default function GraphCanvas({
       aria-label="Kanvas Knowledge Graph interaktif. Gunakan tab Daftar untuk alternatif teks."
     >
       <ForceGraph2D
-        ref={fgRef as any}
+        ref={fgRef}
         width={dimensions.width}
         height={dimensions.height}
         graphData={graphData}
         nodeRelSize={GRAPH_THEME.node.baseRadius}
         nodeCanvasObject={paintNode}
-        nodePointerAreaPaint={(node: any, color, ctx) => {
+        nodePointerAreaPaint={(nodeObj, color, ctx) => {
+          const node = nodeObj as GraphNode;
           const r = getNodeRadius(node);
           ctx.fillStyle = color;
           ctx.beginPath();
-          ctx.arc(node.x, node.y, r + 4, 0, 2 * Math.PI, false);
+          ctx.arc(node.x ?? 0, node.y ?? 0, r + 4, 0, 2 * Math.PI, false);
           ctx.fill();
         }}
         linkCanvasObject={paintLink}

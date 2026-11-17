@@ -36,6 +36,14 @@ export function GraphContent() {
 
   // Mode fokus dari URL param: ?catatan=<id>
   const urlCatatanId = searchParams.get("catatan") || "";
+  const [prevUrlCatatanId, setPrevUrlCatatanId] = useState(urlCatatanId);
+  const [focusNoteId, setFocusNoteId] = useState<string | null>(urlCatatanId || null);
+
+  // Sinkronisasi state saat URL berubah (pola render phase sync)
+  if (prevUrlCatatanId !== urlCatatanId) {
+    setPrevUrlCatatanId(urlCatatanId);
+    setFocusNoteId(urlCatatanId || null);
+  }
 
   // Tab: "graph" atau "list"
   const [activeTab, setActiveTab] = useState<"graph" | "list">("graph");
@@ -60,7 +68,6 @@ export function GraphContent() {
 
   // State Interaksi
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
-  const [focusNoteId, setFocusNoteId] = useState<string | null>(urlCatatanId || null);
 
   // Status API
   const [isLoading, setIsLoading] = useState(true);
@@ -77,13 +84,6 @@ export function GraphContent() {
     fitGraphFnRef.current = fitFn;
     resetZoomFnRef.current = resetFn;
   }, []);
-
-  // Update focusNoteId jika URL query ?catatan berubah
-  useEffect(() => {
-    if (urlCatatanId) {
-      setFocusNoteId(urlCatatanId);
-    }
-  }, [urlCatatanId]);
 
   // Fungsi fetch data graph
   const fetchData = useCallback(async () => {
@@ -145,12 +145,12 @@ export function GraphContent() {
           if (center) {
             setSelectedNode(center);
           }
-        } else if (selectedNode) {
-          // Cari apakah node yang dipilih masih ada di data baru
-          const stillExists = fetchedNodes.find((n) => n.id === selectedNode.id);
-          if (!stillExists) {
-            setSelectedNode(null);
-          }
+        } else {
+          // Cari apakah node yang dipilih sebelumnya masih ada di data baru
+          setSelectedNode((prevSelected) => {
+            if (!prevSelected) return null;
+            return fetchedNodes.find((n) => n.id === prevSelected.id) || null;
+          });
         }
       }
     } catch {
