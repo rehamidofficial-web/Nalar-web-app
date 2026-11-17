@@ -2,6 +2,7 @@ import authRoutes from "./routes/auth.js";
 import notesRoutes from "./routes/notes.js";
 import dashboardRoutes from "./routes/dashboard.js";
 import aiRoutes from "./routes/ai.js";
+import searchRoutes from "./routes/search.js";
 import { prisma } from "./lib/prisma.js";
 import "dotenv/config";
 import express from "express";
@@ -16,6 +17,7 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/notes", notesRoutes);
 app.use("/api/v1/dashboard", dashboardRoutes);
 app.use("/api/v1/ai", aiRoutes);
+app.use("/api/v1/search", searchRoutes);
 
 app.get("/api/v1/health", (_req, res) => {
   res.json({ status: "ok", app: "Nalar" });
