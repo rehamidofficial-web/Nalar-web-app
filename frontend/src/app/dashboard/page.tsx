@@ -165,14 +165,20 @@ export default function DashboardPage() {
           ) : (
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               {/* Kartu 1: Total Catatan */}
-              <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-                <span className="text-xs font-medium text-slate-500">
-                  Total Catatan
-                </span>
-                <p className="mt-2 text-3xl font-extrabold text-slate-900">
+              <Link
+                href="/notes"
+                className="group rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 hover:ring-indigo-300 hover:shadow-md transition-all"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-slate-500 group-hover:text-indigo-600 transition-colors">
+                    Total Catatan
+                  </span>
+                  <span className="text-xs text-slate-400 group-hover:translate-x-0.5 transition-transform">→</span>
+                </div>
+                <p className="mt-2 text-3xl font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors">
                   {stats?.totalNotes ?? 0}
                 </p>
-              </div>
+              </Link>
 
               {/* Kartu 2: Konsep */}
               <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 flex flex-col justify-between">
@@ -192,12 +198,18 @@ export default function DashboardPage() {
               </div>
 
               {/* Kartu 3: Relasi */}
-              <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 flex flex-col justify-between">
+              <Link
+                href="/graph"
+                className="group rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 flex flex-col justify-between hover:ring-indigo-300 hover:shadow-md transition-all"
+              >
                 <div>
-                  <span className="text-xs font-medium text-slate-500">
-                    Relasi
-                  </span>
-                  <p className="mt-2 text-3xl font-extrabold text-slate-900">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500 group-hover:text-indigo-600 transition-colors">
+                      Relasi
+                    </span>
+                    <span className="text-xs text-slate-400 group-hover:translate-x-0.5 transition-transform">→</span>
+                  </div>
+                  <p className="mt-2 text-3xl font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors">
                     {stats?.totalRelationships ?? 0}
                   </p>
                 </div>
@@ -206,7 +218,7 @@ export default function DashboardPage() {
                     Terisi otomatis saat fitur AI aktif
                   </p>
                 )}
-              </div>
+              </Link>
 
               {/* Kartu 4: Aktivitas 7 Hari */}
               <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">

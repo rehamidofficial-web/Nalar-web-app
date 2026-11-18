@@ -1,5 +1,10 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { SearchContent } from "@/components/SearchContent";
+
+export const metadata: Metadata = {
+  title: "Pencarian Semantik",
+};
 
 export default function SearchPage() {
   return (

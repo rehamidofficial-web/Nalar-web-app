@@ -1,5 +1,10 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { GraphContent } from "@/components/graph/GraphContent";
+
+export const metadata: Metadata = {
+  title: "Knowledge Graph",
+};
 
 export default function GraphPage() {
   return (

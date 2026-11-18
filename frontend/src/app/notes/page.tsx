@@ -1,5 +1,10 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { NotesList } from "@/components/NotesList";
+
+export const metadata: Metadata = {
+  title: "Catatan Saya",
+};
 
 export default function NotesPage() {
   return (

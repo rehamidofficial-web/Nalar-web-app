@@ -100,13 +100,37 @@ function EditNoteContent() {
           </div>
         ) : note ? (
           <div>
-            <div className="mb-6">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-                Ubah Catatan
-              </h1>
-              <p className="mt-1 text-sm text-slate-500">
-                Perbarui isi dan tag catatanmu.
-              </p>
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                  Ubah Catatan
+                </h1>
+                <p className="mt-1 text-sm text-slate-500">
+                  Perbarui isi dan tag catatanmu.
+                </p>
+              </div>
+              <div>
+                <Link
+                  href={`/graph?catatan=${note.id}`}
+                  className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
+                >
+                  <svg
+                    className="h-4 w-4 text-slate-500"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0 0 20.25 18V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v12A2.25 2.25 0 0 0 6 20.25Z"
+                    />
+                  </svg>
+                  Lihat di Graph
+                </Link>
+              </div>
             </div>
 
             <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 sm:p-8">

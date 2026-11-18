@@ -1,3 +1,5 @@
+import { clearToken } from "./auth";
+
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
 
@@ -29,6 +31,18 @@ export async function apiFetch<T>(
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
+    if (
+      res.status === 401 &&
+      typeof window !== "undefined" &&
+      !path.startsWith("/auth/login") &&
+      !path.startsWith("/auth/register")
+    ) {
+      clearToken();
+      if (window.location.pathname !== "/login") {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+        window.location.href = "/login";
+      }
+    }
     const json = await res.json();
     return {
       ok: res.ok,

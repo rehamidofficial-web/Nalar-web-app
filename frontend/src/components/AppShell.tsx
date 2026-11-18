@@ -134,11 +134,9 @@ export function AppShell({ user, children }: AppShellProps) {
     {
       name: "Asisten AI",
       href: "/assistant",
-      disabled: true,
-      badge: "Segera",
-      icon: () => (
+      icon: (active) => (
         <svg
-          className="h-5 w-5 text-slate-300"
+          className={`h-5 w-5 ${active ? "text-indigo-600" : "text-slate-400"}`}
           xmlns="http://www.w3.org/2000/svg"
           fill="none"
           viewBox="0 0 24 24"

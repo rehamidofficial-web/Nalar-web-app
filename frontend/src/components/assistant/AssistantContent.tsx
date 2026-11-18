@@ -210,10 +210,10 @@ export function AssistantContent() {
       const res = await apiFetch<AskResponseData>("/ai/ask", {
         method: "POST",
         token,
-        body: JSON.stringify({
+        body: {
           conversationId: targetConvIdAtSend,
           question: q,
-        }),
+        },
       });
 
       if (!res.ok) {

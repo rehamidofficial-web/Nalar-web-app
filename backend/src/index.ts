@@ -15,6 +15,18 @@ const app = express();
 app.use(helmet());
 app.use(cors({ origin: "http://localhost:3000" }));
 app.use(express.json({ limit: "1mb" }));
+// Tangani error sintaks JSON dari body-parser
+app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err instanceof SyntaxError && "status" in err && err.status === 400 && "body" in err) {
+    res.status(400).json({
+      success: false,
+      message: "Format permintaan tidak valid.",
+      errors: [],
+    });
+    return;
+  }
+  next(err);
+});
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/notes", notesRoutes);
 app.use("/api/v1/dashboard", dashboardRoutes);

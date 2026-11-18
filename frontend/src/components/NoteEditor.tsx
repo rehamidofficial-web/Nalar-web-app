@@ -112,6 +112,10 @@ export function NoteEditor({
           if (onSaveSuccess) {
             onSaveSuccess();
           } else {
+            setTitle("");
+            setContent("");
+            setTags([]);
+            setTagInput("");
             router.push("/notes");
           }
         } else {
@@ -132,6 +136,10 @@ export function NoteEditor({
           if (onSaveSuccess) {
             onSaveSuccess();
           } else {
+            setTitle("");
+            setContent("");
+            setTags([]);
+            setTagInput("");
             router.push("/notes");
           }
         } else {

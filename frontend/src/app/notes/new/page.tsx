@@ -28,7 +28,7 @@ export default function NewNotePage() {
         </div>
 
         <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 sm:p-8">
-          <NoteEditor isEdit={false} />
+          <NoteEditor key="new-note" isEdit={false} />
         </div>
       </div>
     </AppShell>

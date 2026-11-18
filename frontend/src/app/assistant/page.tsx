@@ -1,5 +1,10 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { AssistantContent } from "@/components/assistant/AssistantContent";
+
+export const metadata: Metadata = {
+  title: "Asisten AI",
+};
 
 export default function AssistantPage() {
   return (

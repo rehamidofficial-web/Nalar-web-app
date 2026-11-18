@@ -13,7 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Nalar",
+  title: {
+    default: "Nalar",
+    template: "%s · Nalar",
+  },
   description: "Hubungkan Idemu. Temukan Pengetahuanmu.",
   icons: {
     icon: "/favicon.ico",
