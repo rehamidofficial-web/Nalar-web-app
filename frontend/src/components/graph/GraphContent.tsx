@@ -232,15 +232,15 @@ export function GraphContent() {
 
           {/* Tab Selector & Legenda */}
           <div className="flex items-center gap-3">
-            {/* Legenda ringkas */}
-            <div className="hidden lg:flex items-center gap-3 text-xs text-slate-600 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+            {/* Legenda ringkas tema detektif */}
+            <div className="hidden lg:flex items-center gap-3 text-xs text-slate-700 bg-amber-50/80 px-3 py-1.5 rounded-lg border border-amber-200">
               <span className="flex items-center gap-1.5">
-                <span className="w-3 h-0.5 bg-indigo-500 inline-block" />
-                Makna mirip
+                <span className="w-3.5 h-0.5 bg-rose-600 inline-block shadow-xs" />
+                Benang Merah (Makna Mirip)
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-3 border-t-2 border-dashed border-sky-500 inline-block" />
-                Konsep sama
+                <span className="w-3.5 border-t-2 border-dashed border-sky-500 inline-block" />
+                Benang Biru (Konsep Sama)
               </span>
             </div>
 

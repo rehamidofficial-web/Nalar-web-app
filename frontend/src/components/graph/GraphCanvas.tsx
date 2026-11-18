@@ -29,6 +29,8 @@ export default function GraphCanvas({
   const [dimensions, setDimensions] = useState({ width: 600, height: 500 });
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
+  const isHeavyGraph = nodes.length > GRAPH_THEME.performance.heavyThreshold;
+
   // ResizeObserver untuk menyesuaikan kanvas dengan ukuran wadah
   useEffect(() => {
     if (!containerRef.current) return;
@@ -52,24 +54,53 @@ export default function GraphCanvas({
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Set tetangga dari node yang sedang di-hover
-  const hoveredNeighbors = useMemo(() => {
+  // Konfigurasi D3 Force Simulation agar kartu memiliki gaya tolak dan ruang yang cukup
+  useEffect(() => {
+    if (!fgRef.current) return;
+    const fg = fgRef.current;
+
+    // Atur gaya tolak manyBody (charge)
+    interface ForceWithStrength {
+      strength: (val: number) => void;
+    }
+    interface ForceWithDistance {
+      distance: (val: number) => void;
+    }
+
+    const charge = fg.d3Force("charge") as unknown as ForceWithStrength | undefined;
+    if (charge && typeof charge.strength === "function") {
+      charge.strength(GRAPH_THEME.physics.chargeStrength);
+    }
+
+    // Atur jarak pegas relasi (link)
+    const linkForce = fg.d3Force("link") as unknown as ForceWithDistance | undefined;
+    if (linkForce && typeof linkForce.distance === "function") {
+      linkForce.distance(GRAPH_THEME.physics.linkDistance);
+    }
+
+    // Hangatkan simulasi sesaat
+    fg.d3ReheatSimulation();
+  }, [nodes.length, edges.length]);
+
+  // Set tetangga dari node yang sedang di-hover atau selected
+  const activeFocusId = hoveredNodeId || selectedNodeId;
+  const connectedNeighbors = useMemo(() => {
     const neighbors = new Set<string>();
-    if (!hoveredNodeId) return neighbors;
+    if (!activeFocusId) return neighbors;
 
     edges.forEach((edge) => {
       const sourceId = typeof edge.source === "object" ? (edge.source as GraphNode).id : edge.source;
       const targetId = typeof edge.target === "object" ? (edge.target as GraphNode).id : edge.target;
 
-      if (sourceId === hoveredNodeId) {
+      if (sourceId === activeFocusId) {
         neighbors.add(targetId);
-      } else if (targetId === hoveredNodeId) {
+      } else if (targetId === activeFocusId) {
         neighbors.add(sourceId);
       }
     });
 
     return neighbors;
-  }, [hoveredNodeId, edges]);
+  }, [activeFocusId, edges]);
 
   // Siapkan fungsi fit dan reset untuk parent component
   const handleFit = useCallback(() => {
@@ -99,7 +130,7 @@ export default function GraphCanvas({
     };
   }, [nodes, edges]);
 
-  // Auto zoomToFit sekali saat data dimuat
+  // Auto zoomToFit saat awal data termuat
   useEffect(() => {
     if (nodes.length > 0 && fgRef.current) {
       const timer = setTimeout(() => {
@@ -109,111 +140,166 @@ export default function GraphCanvas({
     }
   }, [nodes]);
 
-  // Hitung radius node berdasarkan jumlahHubungan
-  const getNodeRadius = useCallback((node: GraphNode) => {
-    if (node.pusat) return GRAPH_THEME.node.maxRadius + 2;
+  // Hitung dimensi kartu kertas berdasarkan jumlah relasi
+  const getCardDimensions = useCallback((node: GraphNode) => {
     const count = node.jumlahHubungan || 0;
-    const r = GRAPH_THEME.node.baseRadius + count * 1.2;
-    return Math.min(Math.max(r, GRAPH_THEME.node.minRadius), GRAPH_THEME.node.maxRadius);
+    const baseW = GRAPH_THEME.card.baseWidth;
+    const width = Math.min(
+      Math.max(baseW + count * 2.8, GRAPH_THEME.card.minWidth),
+      GRAPH_THEME.card.maxWidth
+    );
+    const height = width * GRAPH_THEME.card.heightRatio;
+    return { width, height };
   }, []);
 
-  // Custom node canvas paint
+  // Helper menggambar rounded rect di kanvas
+  const drawRoundedRect = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    radius: number
+  ) => {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+  };
+
+  // Custom node canvas paint: Kartu Catatan Kertas + Penjepit/Pin
   const paintNode = useCallback(
     (nodeObj: NodeObject<GraphNode>, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const node = nodeObj as GraphNode;
       const nodeX = node.x ?? 0;
       const nodeY = node.y ?? 0;
-      const r = getNodeRadius(node);
+      const { width, height } = getCardDimensions(node);
+
       const isSelected = selectedNodeId === node.id;
       const isHovered = hoveredNodeId === node.id;
-      const isNeighborOfHovered = hoveredNeighbors.has(node.id);
+      const isConnected = connectedNeighbors.has(node.id);
       const isSearched =
         searchQuery.trim().length > 0 &&
         node.label.toLowerCase().includes(searchQuery.toLowerCase().trim());
       const isExplicitlyHighlighted = highlightedNodeIds?.has(node.id);
 
-      // Tentukan warna
-      let fillColor = GRAPH_THEME.node.defaultColor;
+      const isFocused = isSelected || isHovered || isExplicitlyHighlighted;
+      const hasActiveContext = Boolean(activeFocusId);
+      const isDimmed = hasActiveContext && !isFocused && !isConnected;
 
+      const cardLeft = nodeX - width / 2;
+      const cardTop = nodeY - height / 2;
+
+      ctx.save();
+
+      // Bayangan kartu (jika tidak sedang grafik berat)
+      if (!isHeavyGraph && !isDimmed) {
+        ctx.shadowColor = isFocused ? "rgba(225, 29, 72, 0.45)" : GRAPH_THEME.card.shadowColor;
+        ctx.shadowBlur = isFocused ? 10 : GRAPH_THEME.card.shadowBlur;
+        ctx.shadowOffsetY = isFocused ? 4 : 2;
+      }
+
+      // Warna isi kertas
+      let cardBg = GRAPH_THEME.card.defaultBg;
       if (node.pusat) {
-        fillColor = GRAPH_THEME.node.centerHighlight;
+        cardBg = GRAPH_THEME.card.centerBg;
       } else if (node.jumlahHubungan === 0) {
-        fillColor = GRAPH_THEME.node.isolatedColor;
+        cardBg = GRAPH_THEME.card.isolatedBg;
       }
 
-      if (isSelected || isExplicitlyHighlighted) {
-        fillColor = GRAPH_THEME.node.highlightColor;
-      } else if (hoveredNodeId) {
-        if (isHovered) {
-          fillColor = GRAPH_THEME.node.highlightColor;
-        } else if (isNeighborOfHovered) {
-          fillColor = GRAPH_THEME.node.defaultColor;
-        } else {
-          fillColor = GRAPH_THEME.node.dimmedColor;
-        }
+      if (isFocused) {
+        cardBg = GRAPH_THEME.card.selectedBg;
+      } else if (isDimmed) {
+        cardBg = GRAPH_THEME.card.dimmedBg;
       }
 
-      // Gambar lingkaran luar jika dicari / dipilih
-      if (isSearched || isSelected || isHovered) {
-        ctx.beginPath();
-        ctx.arc(nodeX, nodeY, r + 3, 0, 2 * Math.PI, false);
-        ctx.fillStyle = isSearched ? "rgba(245, 158, 11, 0.35)" : "rgba(225, 29, 72, 0.25)";
-        ctx.fill();
-      }
-
-      // Gambar lingkaran node
-      ctx.beginPath();
-      ctx.arc(nodeX, nodeY, r, 0, 2 * Math.PI, false);
-      ctx.fillStyle = fillColor;
+      // 1. Gambar Lembaran Kertas Kartu
+      drawRoundedRect(ctx, cardLeft, cardTop, width, height, GRAPH_THEME.card.radius);
+      ctx.fillStyle = cardBg;
       ctx.fill();
 
-      // Border lingkaran
-      ctx.lineWidth = isSelected || isHovered ? 2 : 1;
-      ctx.strokeStyle = isSelected || isHovered ? "#ffffff" : "rgba(255, 255, 255, 0.6)";
+      // Matikan bayangan untuk stroke & elemen detail di atasnya
+      ctx.shadowColor = "transparent";
+
+      // Border kertas
+      ctx.lineWidth = isFocused ? 2 : 1;
+      ctx.strokeStyle = isFocused
+        ? GRAPH_THEME.card.borderHighlight
+        : isSearched
+        ? "#f59e0b"
+        : isDimmed
+        ? "rgba(255, 255, 255, 0.08)"
+        : GRAPH_THEME.card.borderColor;
       ctx.stroke();
 
-      // Label teks: tampilkan jika zoom cukup dekat atau node disorot/dipilih/dicari
-      const shouldDrawLabel =
-        globalScale > 1.4 || isSelected || isHovered || isNeighborOfHovered || isSearched || node.pusat;
+      // 2. Gambar Penjepit Kertas / Pin Detektif di bagian atas kartu
+      const pinX = nodeX;
+      const pinY = cardTop + 1;
 
-      if (shouldDrawLabel) {
-        const fullLabel = node.label || "";
-        const label = fullLabel.length > 24 ? fullLabel.slice(0, 22) + "…" : fullLabel;
-        const fontSize = Math.max(10 / globalScale, 3);
-        ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
+      // Klip Kertas Logam (U-clip)
+      ctx.beginPath();
+      ctx.strokeStyle = isFocused ? GRAPH_THEME.card.paperclipHighlight : GRAPH_THEME.card.paperclipColor;
+      ctx.lineWidth = 1.4;
+      ctx.roundRect(pinX - 4, pinY - 4, 8, 10, 3);
+      ctx.stroke();
 
-        const textY = nodeY + r + 3;
+      // Pin Merah Bundar di tengah klip (identitas Benang Merah Nalar)
+      ctx.beginPath();
+      ctx.arc(pinX, pinY - 2, GRAPH_THEME.card.pinRadius, 0, 2 * Math.PI, false);
+      ctx.fillStyle = isDimmed
+        ? "#78350f"
+        : node.pusat
+        ? GRAPH_THEME.card.pinCenterColor
+        : isFocused
+        ? GRAPH_THEME.card.pinHighlight
+        : GRAPH_THEME.card.pinColor;
+      ctx.fill();
+      ctx.lineWidth = 0.8;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+      ctx.stroke();
 
-        // Background label agar terbaca jelas
-        const textWidth = ctx.measureText(label).width;
-        ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
-        ctx.fillRect(
-          nodeX - textWidth / 2 - 2,
-          textY - 1,
-          textWidth + 4,
-          fontSize + 2
-        );
+      // 3. Teks Judul Catatan di dalam Kertas
+      const rawTitle = node.label || "";
+      // Potong judul agar muat rapi di kartu kecil
+      const maxChars = width > 75 ? 20 : 13;
+      const displayTitle = rawTitle.length > maxChars ? rawTitle.slice(0, maxChars - 1) + "…" : rawTitle;
 
-        ctx.fillStyle =
-          hoveredNodeId && !isHovered && !isNeighborOfHovered
-            ? GRAPH_THEME.node.textDimmedColor
-            : GRAPH_THEME.node.textColor;
-        ctx.fillText(label, nodeX, textY);
-      }
+      const fontSize = Math.max(9 / Math.max(globalScale, 0.8), 7.5);
+      ctx.font = `600 ${fontSize}px ${GRAPH_THEME.card.fontFamily}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      ctx.fillStyle = isDimmed
+        ? GRAPH_THEME.card.textDimmedColor
+        : isFocused
+        ? "#0f172a"
+        : GRAPH_THEME.card.textColor;
+
+      // Gambar judul di tengah kartu
+      ctx.fillText(displayTitle, nodeX, nodeY + 3);
+
+      ctx.restore();
     },
     [
-      getNodeRadius,
+      getCardDimensions,
       selectedNodeId,
       hoveredNodeId,
-      hoveredNeighbors,
+      activeFocusId,
+      connectedNeighbors,
       searchQuery,
       highlightedNodeIds,
+      isHeavyGraph,
     ]
   );
 
-  // Custom link canvas paint
+  // Custom link canvas paint: Benang Merah Detektif (Melengkung) & Benang Putus-Putus
   const paintLink = useCallback(
     (linkObj: LinkObject<GraphNode, GraphEdge>, ctx: CanvasRenderingContext2D) => {
       const link = linkObj as unknown as {
@@ -234,79 +320,113 @@ export default function GraphCanvas({
       const targetX = targetNode?.x ?? 0;
       const targetY = targetNode?.y ?? 0;
 
-      const isConnectedToHovered =
-        hoveredNodeId && (sourceId === hoveredNodeId || targetId === hoveredNodeId);
-      const isConnectedToSelected =
-        selectedNodeId && (sourceId === selectedNodeId || targetId === selectedNodeId);
-
-      let strokeColor =
-        link.type === "similar"
-          ? GRAPH_THEME.edge.similarColor
-          : GRAPH_THEME.edge.conceptColor;
-      let lineWidth =
-        link.type === "similar"
-          ? Math.max(
-              GRAPH_THEME.edge.similarMinWidth,
-              (link.similarity || 0.5) * GRAPH_THEME.edge.similarMaxWidth
-            )
-          : GRAPH_THEME.edge.conceptWidth;
-
-      if (hoveredNodeId) {
-        if (isConnectedToHovered) {
-          strokeColor = GRAPH_THEME.edge.highlightColor;
-          lineWidth += 1;
-        } else {
-          strokeColor = GRAPH_THEME.edge.dimmedColor;
-        }
-      } else if (isConnectedToSelected) {
-        strokeColor = GRAPH_THEME.edge.highlightColor;
-        lineWidth += 0.8;
-      }
+      const isConnectedToFocus =
+        activeFocusId && (sourceId === activeFocusId || targetId === activeFocusId);
+      const hasActiveContext = Boolean(activeFocusId);
+      const isDimmed = hasActiveContext && !isConnectedToFocus;
 
       ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(sourceX, sourceY);
-      ctx.lineTo(targetX, targetY);
+
+      const isSimilar = link.type === "similar";
+
+      // Warna & Ketebalan Benang
+      let strokeColor: string;
+      let lineWidth: number;
+
+      if (isSimilar) {
+        // Benang merah
+        if (isConnectedToFocus) {
+          strokeColor = GRAPH_THEME.thread.similarHighlight;
+          lineWidth = Math.max(2.2, (link.similarity || 0.6) * GRAPH_THEME.thread.similarMaxWidth + 1.2);
+          if (!isHeavyGraph) {
+            ctx.shadowColor = "rgba(225, 29, 72, 0.8)";
+            ctx.shadowBlur = 6;
+          }
+        } else if (isDimmed) {
+          strokeColor = GRAPH_THEME.thread.similarDimmed;
+          lineWidth = GRAPH_THEME.thread.similarMinWidth * 0.8;
+        } else {
+          strokeColor = GRAPH_THEME.thread.similarColor;
+          lineWidth = Math.max(
+            GRAPH_THEME.thread.similarMinWidth,
+            (link.similarity || 0.5) * GRAPH_THEME.thread.similarMaxWidth
+          );
+        }
+      } else {
+        // Benang konsep (biru/kapur putus-putus)
+        if (isConnectedToFocus) {
+          strokeColor = GRAPH_THEME.thread.conceptHighlight;
+          lineWidth = GRAPH_THEME.thread.conceptWidth + 1;
+        } else if (isDimmed) {
+          strokeColor = GRAPH_THEME.thread.conceptDimmed;
+          lineWidth = GRAPH_THEME.thread.conceptWidth * 0.7;
+        } else {
+          strokeColor = GRAPH_THEME.thread.conceptColor;
+          lineWidth = GRAPH_THEME.thread.conceptWidth;
+        }
+      }
+
       ctx.strokeStyle = strokeColor;
       ctx.lineWidth = lineWidth;
 
-      if (link.type === "concept") {
-        ctx.setLineDash(GRAPH_THEME.edge.dashPattern);
+      if (!isSimilar) {
+        ctx.setLineDash(GRAPH_THEME.thread.dashPattern);
       } else {
         ctx.setLineDash([]);
       }
 
+      // Garis sedikit melengkung (lengkungan menggantung khas benang di papan)
+      const dx = targetX - sourceX;
+      const dy = targetY - sourceY;
+      const curvature = isSimilar ? GRAPH_THEME.thread.curvature : GRAPH_THEME.thread.conceptCurvature;
+
+      // Titik kontrol kurva Bézier kuadratik
+      const midX = (sourceX + targetX) / 2 - dy * curvature;
+      const midY = (sourceY + targetY) / 2 + dx * curvature;
+
+      ctx.beginPath();
+      ctx.moveTo(sourceX, sourceY);
+      ctx.quadraticCurveTo(midX, midY, targetX, targetY);
       ctx.stroke();
+
       ctx.restore();
     },
-    [hoveredNodeId, selectedNodeId]
+    [activeFocusId, isHeavyGraph]
   );
 
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full min-h-[480px] bg-slate-50 overflow-hidden select-none"
+      className="relative w-full h-full min-h-[480px] overflow-hidden select-none"
+      style={{ backgroundColor: GRAPH_THEME.board.background }}
       role="region"
-      aria-label="Kanvas Knowledge Graph interaktif. Gunakan tab Daftar untuk alternatif teks."
+      aria-label="Kanvas Knowledge Graph interaktif bertema Papan Detektif. Gunakan tab Daftar untuk alternatif teks."
     >
       <ForceGraph2D
         ref={fgRef}
         width={dimensions.width}
         height={dimensions.height}
         graphData={graphData}
-        nodeRelSize={GRAPH_THEME.node.baseRadius}
+        nodeRelSize={GRAPH_THEME.card.baseWidth / 2}
         nodeCanvasObject={paintNode}
         nodePointerAreaPaint={(nodeObj, color, ctx) => {
           const node = nodeObj as GraphNode;
-          const r = getNodeRadius(node);
+          const { width, height } = getCardDimensions(node);
           ctx.fillStyle = color;
-          ctx.beginPath();
-          ctx.arc(node.x ?? 0, node.y ?? 0, r + 4, 0, 2 * Math.PI, false);
+          drawRoundedRect(
+            ctx,
+            (node.x ?? 0) - width / 2 - 2,
+            (node.y ?? 0) - height / 2 - 2,
+            width + 4,
+            height + 4,
+            GRAPH_THEME.card.radius
+          );
           ctx.fill();
         }}
         linkCanvasObject={paintLink}
-        backgroundColor={GRAPH_THEME.background}
-        cooldownTicks={100}
+        backgroundColor={GRAPH_THEME.board.background}
+        cooldownTicks={120}
+        d3VelocityDecay={GRAPH_THEME.physics.velocityDecay}
         onNodeClick={(node) => {
           onSelectNode(node as GraphNode);
         }}
