@@ -17,9 +17,16 @@ interface SearchResultItem {
   updatedAt: string;
 }
 
+interface InfoKoreksi {
+  asli: string;
+  dipakai: string;
+  perubahan: { dari: string; ke: string }[];
+}
+
 interface SearchResponseData {
   mode: "makna" | "kata";
   query: string;
+  koreksi?: InfoKoreksi | null;
   results: SearchResultItem[];
   belumDiindeks: number;
 }
@@ -50,6 +57,7 @@ export function SearchContent() {
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [mode, setMode] = useState<"makna" | "kata">("makna");
   const [modeMessage, setModeMessage] = useState("");
+  const [koreksi, setKoreksi] = useState<InfoKoreksi | null>(null);
   const [belumDiindeks, setBelumDiindeks] = useState(0);
 
   const [hasSearched, setHasSearched] = useState(false);
@@ -86,6 +94,7 @@ export function SearchContent() {
       if (!res.ok) {
         setErrorMessage(pesanError(res));
         setResults([]);
+        setKoreksi(null);
         return;
       }
 
@@ -93,6 +102,7 @@ export function SearchContent() {
         setResults(res.data.results || []);
         setMode(res.data.mode);
         setModeMessage(res.message || "");
+        setKoreksi(res.data.koreksi || null);
         setBelumDiindeks(res.data.belumDiindeks || 0);
       }
     });
@@ -279,10 +289,15 @@ export function SearchContent() {
         {/* Hasil Pencarian */}
         {!isLoading && hasSearched && (
           <div>
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4">
               <p className="text-sm font-medium text-slate-700">
                 {results.length} hasil untuk &ldquo;{activeQuery}&rdquo;
               </p>
+              {koreksi && (
+                <p className="mt-1 text-xs text-slate-500">
+                  Menampilkan hasil untuk &apos;{koreksi.dipakai}&apos; (kamu mengetik &apos;{koreksi.asli}&apos;)
+                </p>
+              )}
             </div>
 
             {results.length === 0 ? (

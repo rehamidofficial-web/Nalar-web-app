@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
+import { ambilKamus, koreksiKalimat } from "../lib/koreksiTypo.js";
 import { createEmbedding, generateText, kirimErrorAi, AiError } from "../services/ai.service.js";
 import {
   ambilKonteks,
@@ -213,8 +214,22 @@ router.post("/ask", async (req, res) => {
       }
     }
 
-    // 4. Buat embedding & ambil konteks
-    const teksPencarian = buatTeksPencarian(question, pertanyaanSebelumnya);
+    // 4. Koreksi Typo Berbasis Kamus Pengguna (sebelum embedding, kunci cache, fallback kata)
+    let pertanyaanDipakai = question;
+    let infoKoreksi: { asli: string; dipakai: string; perubahan: { dari: string; ke: string }[] } | null = null;
+    try {
+      const kamus = await ambilKamus(userId);
+      const hasilKoreksi = koreksiKalimat(question, kamus);
+      if (hasilKoreksi.perubahan.length > 0) {
+        pertanyaanDipakai = hasilKoreksi.dipakai;
+        infoKoreksi = hasilKoreksi;
+      }
+    } catch {
+      // Lewati koreksi jika gagal membangun kamus
+    }
+
+    // 5. Buat embedding & ambil konteks
+    const teksPencarian = buatTeksPencarian(pertanyaanDipakai, pertanyaanSebelumnya);
     let konteks: KonteksCatatan[] = [];
     let mode: "makna" | "kata" = "makna";
 
@@ -244,8 +259,8 @@ router.post("/ask", async (req, res) => {
     if (mode === "makna" && embedding) {
       konteks = await ambilKonteks({ userId, embedding });
     } else {
-      // Cadangan pencarian kata biasa dari judul/isi catatan
-      const kataKunci = question.slice(0, 50).trim();
+      // Cadangan pencarian kata biasa dari judul/isi catatan memakai pertanyaan terkoreksi
+      const kataKunci = pertanyaanDipakai.slice(0, 50).trim();
       const catatanKata = await prisma.note.findMany({
         where: {
           userId,
@@ -266,7 +281,7 @@ router.post("/ask", async (req, res) => {
       }));
     }
 
-    // 5. Jika konteks kosong, JANGAN panggil AI untuk jawaban (hemat kuota & cegah halusinasi)
+    // 6. Jika konteks kosong, JANGAN panggil AI untuk jawaban (hemat kuota & cegah halusinasi)
     let jawaban = "";
     const sources = konteks.map((k) => ({
       noteId: k.noteId,
@@ -297,11 +312,11 @@ router.post("/ask", async (req, res) => {
       }
     }
 
-    // 6. Simpan dalam satu transaksi (buat percakapan baru jika belum ada)
+    // 7. Simpan dalam satu transaksi (buat percakapan baru jika belum ada)
     const resultConv = await prisma.$transaction(async (tx) => {
       let finalConvId = percakapanId;
       if (!finalConvId) {
-        // Judul percakapan: 60 karakter pertama pertanyaan
+        // Judul percakapan: 60 karakter pertama pertanyaan asli
         const titleConv = question.slice(0, 60).trim();
         const createdConv = await tx.aiConversation.create({
           data: {
@@ -312,7 +327,7 @@ router.post("/ask", async (req, res) => {
         finalConvId = createdConv.id;
       }
 
-      // Buat pesan user terlebih dahulu
+      // Buat pesan user terlebih dahulu (tetap pakai pertanyaan asli)
       await tx.aiMessage.create({
         data: {
           conversationId: finalConvId,
@@ -355,6 +370,7 @@ router.post("/ask", async (req, res) => {
         answer: jawaban,
         sources: konteks.length > 0 ? sources : [],
         mode,
+        koreksi: infoKoreksi,
       },
     });
   } catch (error) {

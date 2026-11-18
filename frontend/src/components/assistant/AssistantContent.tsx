@@ -226,8 +226,15 @@ export function AssistantContent() {
       }
 
       if (res.data) {
-        const { conversationId, answer, sources, mode } = res.data;
+        const { conversationId, answer, sources, mode, koreksi } = res.data;
         setLastMode(mode);
+
+        // Jika ada koreksi kata, update pesan pengguna yang tadi dikirim
+        if (koreksi) {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === tempId ? { ...m, koreksi } : m))
+          );
+        }
 
         messageCounterRef.current += 1;
         const newAssistantMessage: AssistantMessage = {
@@ -481,6 +488,13 @@ export function AssistantContent() {
                     >
                       {/* Teks Pesan Asli (pertahankan baris baru) */}
                       <div className="whitespace-pre-wrap">{msg.content}</div>
+
+                      {/* Info Koreksi Typo untuk Pesan Pengguna */}
+                      {isUser && msg.koreksi && (
+                        <div className="mt-2 pt-2 border-t border-indigo-500/30 text-[11px] text-indigo-100">
+                          Menampilkan hasil untuk &apos;{msg.koreksi.dipakai}&apos; (kamu mengetik &apos;{msg.koreksi.asli}&apos;)
+                        </div>
+                      )}
 
                       {/* Sumber Catatan untuk Pesan Asisten */}
                       {!isUser && msg.sources && msg.sources.length > 0 && (

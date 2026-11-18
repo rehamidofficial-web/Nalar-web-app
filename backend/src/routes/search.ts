@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { createEmbedding, kirimErrorAi, AiError } from "../services/ai.service.js";
 import { cariCatatanMirip } from "../services/vector.service.js";
+import { ambilKamus, koreksiKalimat } from "../lib/koreksiTypo.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -166,6 +167,20 @@ router.get("/", async (req, res) => {
 
   const { q, limit } = parseResult.data;
 
+  // 2.5 Koreksi Typo Berbasis Kamus Catatan Pengguna (0 panggilan AI)
+  let teksPencarian = q;
+  let infoKoreksi: { asli: string; dipakai: string; perubahan: { dari: string; ke: string }[] } | null = null;
+  try {
+    const kamus = await ambilKamus(userId);
+    const hasilKoreksi = koreksiKalimat(q, kamus);
+    if (hasilKoreksi.perubahan.length > 0) {
+      teksPencarian = hasilKoreksi.dipakai;
+      infoKoreksi = hasilKoreksi;
+    }
+  } catch {
+    // Lewati koreksi jika gagal membangun kamus
+  }
+
   // 3. Hitung catatan milik user yang belum terindeks embedding
   const hitungBelumDiindeks = async (): Promise<number> => {
     try {
@@ -189,8 +204,8 @@ router.get("/", async (req, res) => {
       where: {
         userId,
         OR: [
-          { title: { contains: q, mode: "insensitive" } },
-          { content: { contains: q, mode: "insensitive" } },
+          { title: { contains: teksPencarian, mode: "insensitive" } },
+          { content: { contains: teksPencarian, mode: "insensitive" } },
         ],
       },
       select: {
@@ -214,6 +229,7 @@ router.get("/", async (req, res) => {
       data: {
         mode: "kata",
         query: q,
+        koreksi: infoKoreksi,
         results: notes.map((n) => ({
           noteId: n.id,
           title: n.title,
@@ -228,16 +244,16 @@ router.get("/", async (req, res) => {
   };
 
   // 5. Coba pencarian makna dengan embedding
-  let embedding = getCachedEmbedding(userId, q);
+  let embedding = getCachedEmbedding(userId, teksPencarian);
   let cacheHit = false;
 
   if (embedding) {
     cacheHit = true;
   } else {
     try {
-      const embRes = await createEmbedding(q);
+      const embRes = await createEmbedding(teksPencarian);
       embedding = embRes.embedding;
-      setCachedEmbedding(userId, q, embedding);
+      setCachedEmbedding(userId, teksPencarian, embedding);
     } catch (err: any) {
       // Periksa apakah error karena kuota habis atau service gangguan
       const status =
@@ -320,6 +336,7 @@ router.get("/", async (req, res) => {
       data: {
         mode: "makna",
         query: q,
+        koreksi: infoKoreksi,
         results,
         belumDiindeks,
       },

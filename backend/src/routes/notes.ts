@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
+import { hapusCacheKamus } from "../lib/koreksiTypo.js";
 import {
   hapusEmbeddingCatatan,
   jalankanEmbeddingDiLatarBelakang,
@@ -335,6 +336,7 @@ router.post("/", async (req, res) => {
     message: "Catatan berhasil dibuat",
     data: note,
   });
+  hapusCacheKamus(userId);
   void jalankanEmbeddingDiLatarBelakang({
     id: note.id,
     title: note.title,
@@ -432,6 +434,7 @@ router.patch("/:id", async (req, res) => {
     message: "Catatan berhasil diperbarui",
     data: updatedNote,
   });
+  hapusCacheKamus(userId);
   if (isiEmbeddingBerubah) {
     void jalankanEmbeddingDiLatarBelakang({
       id: updatedNote.id,
@@ -475,6 +478,7 @@ router.delete("/:id", async (req, res) => {
   await prisma.note.delete({
     where: { id },
   });
+  hapusCacheKamus(userId);
 
   // Task 3.7: Bersihkan konsep yatim milik pengguna setelah catatan terhapus
   await prisma.concept.deleteMany({
