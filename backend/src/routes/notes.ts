@@ -346,6 +346,137 @@ router.post("/", async (req, res) => {
   return;
 });
 
+const mergeNotesSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, "Judul minimal 1 karakter dan tidak boleh hanya spasi")
+    .max(255, "Judul maksimal 255 karakter"),
+  content: z
+    .string()
+    .trim()
+    .min(1, "Isi catatan minimal 1 karakter dan tidak boleh hanya spasi")
+    .max(50000, "Isi catatan maksimal 50.000 karakter"),
+  tags: tagsSchema.optional().default([]),
+  sourceNoteIds: z
+    .array(z.string().uuid("ID catatan harus berupa UUID yang valid"))
+    .min(2, "Pilih minimal 2 catatan sumber")
+    .max(5, "Pilih maksimal 5 catatan sumber")
+    .refine((arr) => new Set(arr).size === arr.length, {
+      message: "Daftar catatan sumber tidak boleh memuat ID yang sama.",
+    }),
+  hapusAsli: z.boolean().optional().default(false),
+});
+
+/**
+ * POST /api/v1/notes/merge
+ * Menyimpan catatan hasil gabungan dan opsi hapus catatan sumber
+ */
+router.post("/merge", async (req, res) => {
+  const parsed = mergeNotesSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(422).json({
+      success: false,
+      message: "Data penggabungan tidak valid",
+      errors: parsed.error.issues.map((i) => ({
+        field: i.path.join("."),
+        message: i.message,
+      })),
+    });
+    return;
+  }
+
+  const userId = req.userId!;
+  const { title, content, tags, sourceNoteIds, hapusAsli } = parsed.data;
+
+  // Pastikan seluruh sourceNoteIds milik userId
+  const countSources = await prisma.note.count({
+    where: {
+      id: { in: sourceNoteIds },
+      userId,
+    },
+  });
+
+  if (countSources !== sourceNoteIds.length) {
+    res.status(404).json({
+      success: false,
+      message: "Catatan tidak ditemukan.",
+      errors: [],
+    });
+    return;
+  }
+
+  try {
+    const newNote = await prisma.$transaction(async (tx) => {
+      // 1. Buat catatan baru
+      const created = await tx.note.create({
+        data: {
+          userId,
+          title,
+          content,
+          tags,
+        },
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          summary: true,
+          tags: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      // 2. Jika opsi hapusAsli true, hapus catatan sumber
+      if (hapusAsli) {
+        await tx.note.deleteMany({
+          where: {
+            id: { in: sourceNoteIds },
+            userId,
+          },
+        });
+
+        // Bersihkan konsep yatim milik pengguna setelah catatan terhapus
+        await tx.concept.deleteMany({
+          where: {
+            userId,
+            noteConcepts: {
+              none: {},
+            },
+          },
+        });
+      }
+
+      return created;
+    });
+
+    hapusCacheKamus(userId);
+
+    // Jalankan embedding catatan baru di latar belakang (juga akan memicu relasi)
+    void jalankanEmbeddingDiLatarBelakang({
+      id: newNote.id,
+      title: newNote.title,
+      content: newNote.content,
+      userId,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Catatan gabungan berhasil disimpan",
+      data: newNote,
+    });
+    return;
+  } catch (err) {
+    console.error("Error menyimpan catatan gabungan:", err);
+    res.status(500).json({
+      success: false,
+      message: "Gagal menyimpan catatan gabungan",
+      errors: [],
+    });
+    return;
+  }
+});
+
 // 5. PATCH /api/v1/notes/:id (Update catatan)
 router.patch("/:id", async (req, res) => {
   const { id } = req.params;

@@ -66,6 +66,9 @@ export function NotesList() {
   const [isFetching, setIsFetching] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  // State untuk mode pilih catatan (Merge Catatan)
+  const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
+
   // Hapus catatan modal state
   const [noteToDelete, setNoteToDelete] = useState<NoteItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -221,6 +224,19 @@ export function NotesList() {
       isCancelled = true;
     };
   }, [user, paramPage, paramSearch, paramTag, paramSort]);
+
+  // Fungsi toggle pilihan catatan untuk gabung
+  function toggleSelectNote(id: string) {
+    setSelectedNoteIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((item) => item !== id);
+      }
+      if (prev.length >= 5) {
+        return prev;
+      }
+      return [...prev, id];
+    });
+  }
 
   // Handle konfirmasi hapus catatan
   async function handleConfirmDelete() {
@@ -407,6 +423,44 @@ export function NotesList() {
           </div>
         )}
 
+        {/* Bilah Aksi Gabungkan Catatan dengan AI */}
+        {selectedNoteIds.length > 0 && (
+          <div className="sticky top-20 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-semibold text-indigo-900">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs text-white">
+                {selectedNoteIds.length}
+              </span>
+              <span>
+                {selectedNoteIds.length} catatan dipilih (maksimal 5 pada halaman ini)
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedNoteIds([])}
+                className="inline-flex min-h-[36px] items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Batal
+              </button>
+              <Link
+                href={`/notes/merge?ids=${selectedNoteIds.join(",")}`}
+                className={`inline-flex min-h-[36px] items-center justify-center rounded-lg px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors ${
+                  selectedNoteIds.length >= 2
+                    ? "bg-indigo-600 hover:bg-indigo-700"
+                    : "bg-indigo-400 cursor-not-allowed pointer-events-none"
+                }`}
+                title={
+                  selectedNoteIds.length < 2
+                    ? "Pilih minimal 2 catatan untuk digabung"
+                    : "Gabungkan catatan yang dipilih"
+                }
+              >
+                Gabungkan dengan AI
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Konten Daftar Catatan */}
         {isInitialLoading ? (
           /* Kartu Kerangka Skeleton Berdenyut */
@@ -490,17 +544,44 @@ export function NotesList() {
               isFetching ? "opacity-60" : "opacity-100"
             }`}
           >
-            {notes.map((note) => (
-              <div
-                key={note.id}
-                className="flex flex-col justify-between rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 transition hover:shadow-md"
-              >
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900 line-clamp-1">
-                    {note.title}
-                  </h2>
+            {notes.map((note) => {
+              const isSelected = selectedNoteIds.includes(note.id);
+              const reachedLimit = selectedNoteIds.length >= 5 && !isSelected;
 
-                  <p className="mt-2 text-sm text-slate-600 line-clamp-3 whitespace-pre-wrap">
+              return (
+                <div
+                  key={note.id}
+                  className={`flex flex-col justify-between rounded-2xl bg-white p-5 shadow-sm ring-1 transition hover:shadow-md ${
+                    isSelected
+                      ? "ring-2 ring-indigo-600 bg-indigo-50/20"
+                      : "ring-slate-200"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <h2 className="text-lg font-bold text-slate-900 line-clamp-1 flex-1">
+                        {note.title}
+                      </h2>
+                      <label
+                        className="inline-flex items-center gap-1.5 cursor-pointer text-xs text-slate-500 hover:text-indigo-600"
+                        title={
+                          reachedLimit
+                            ? "Maksimal 5 catatan sekaligus"
+                            : "Pilih untuk digabung"
+                        }
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          disabled={reachedLimit}
+                          onChange={() => toggleSelectNote(note.id)}
+                          className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 disabled:opacity-40"
+                        />
+                        <span className="sr-only">Pilih catatan {note.title}</span>
+                      </label>
+                    </div>
+
+                    <p className="mt-2 text-sm text-slate-600 line-clamp-3 whitespace-pre-wrap">
                     {note.summary || note.contentPreview || "Tidak ada isi teks."}
                   </p>
 
@@ -542,8 +623,9 @@ export function NotesList() {
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
+        </div>
         )}
 
         {/* Kontrol Pagination */}
