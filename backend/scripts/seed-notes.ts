@@ -184,10 +184,25 @@ async function main() {
     return;
   }
 
-  console.log(`Membuat 25 catatan contoh untuk pengguna: ${user.name} (${email})...`);
+  // Cek apakah catatan contoh sudah ada agar tidak menggandakan (idempotent)
+  const existingNotes = await prisma.note.findMany({
+    where: {
+      userId: user.id,
+      title: { startsWith: "[Contoh]" },
+    },
+    select: { title: true },
+  });
+  const existingTitles = new Set(existingNotes.map((n) => n.title));
+
+  console.log(`Memproses 25 catatan contoh untuk pengguna: ${user.name} (${email})...`);
 
   let count = 0;
+  let skipped = 0;
   for (const item of sampleNotes) {
+    if (existingTitles.has(item.title)) {
+      skipped++;
+      continue;
+    }
     await prisma.note.create({
       data: {
         userId: user.id,
@@ -199,7 +214,9 @@ async function main() {
     count++;
   }
 
-  console.log(`Selesai! Berhasil membuat ${count} catatan contoh.`);
+  console.log(
+    `Selesai! Berhasil membuat ${count} catatan baru (dilewati ${skipped} karena sudah ada).`
+  );
 }
 
 main()
