@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
+import { BATAS_PANJANG_TAG } from "../lib/batasInput.js";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
@@ -24,7 +25,11 @@ const graphQuerySchema = z.object({
     .min(0, "skorMin minimal 0.")
     .max(1, "skorMin maksimal 1.")
     .default(0),
-  tag: z.string().trim().optional(),
+  tag: z
+    .string()
+    .trim()
+    .max(BATAS_PANJANG_TAG, `Tag maksimal ${BATAS_PANJANG_TAG} karakter`)
+    .optional(),
 });
 
 // Validasi query parameter untuk GET /api/v1/graph/:noteId

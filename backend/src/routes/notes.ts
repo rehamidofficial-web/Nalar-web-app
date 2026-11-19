@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
+import { BATAS_HALAMAN, BATAS_PANJANG_TAG } from "../lib/batasInput.js";
 import { requireAuth } from "../middleware/auth.js";
 import { hapusCacheKamus } from "../lib/koreksiTypo.js";
 import {
@@ -74,6 +75,7 @@ const getNotesQuerySchema = z.object({
     .number()
     .int("Page harus bilangan bulat")
     .min(1, "Page minimal 1")
+    .max(BATAS_HALAMAN, `Page maksimal ${BATAS_HALAMAN}`)
     .default(1),
   limit: z.coerce
     .number()
@@ -90,6 +92,7 @@ const getNotesQuerySchema = z.object({
     .string()
     .trim()
     .toLowerCase()
+    .max(BATAS_PANJANG_TAG, `Tag maksimal ${BATAS_PANJANG_TAG} karakter`)
     .optional(),
   sort: z
     .enum(["terbaru", "terlama", "judul"])

@@ -6,12 +6,15 @@ import searchRoutes from "./routes/search.js";
 import graphRoutes from "./routes/graph.js";
 import assistantRoutes from "./routes/assistant.js";
 import { prisma } from "./lib/prisma.js";
+import { validateJwtSecretConfiguration } from "./lib/jwt.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { batasUmum } from "./middleware/rateLimit.js";
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+
+validateJwtSecretConfiguration();
 
 // Tangani uncaughtException dan unhandledRejection di tingkat proses
 process.on("uncaughtException", (err) => {

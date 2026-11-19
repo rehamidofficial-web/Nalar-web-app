@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { Buffer } from "node:buffer";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
@@ -7,16 +8,28 @@ import { requireAuth } from "../middleware/auth.js";
 import { batasAuth } from "../middleware/rateLimit.js";
 
 const router = Router();
+const BCRYPT_ROUNDS = 10;
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync("nalar-dummy-password", BCRYPT_ROUNDS);
+const MAX_PASSWORD_BYTES = 72;
+
+const passwordWithinBcryptLimit = (password: string) =>
+  Buffer.byteLength(password, "utf8") <= MAX_PASSWORD_BYTES;
 
 const registerSchema = z.object({
   name: z.string().trim().min(2, "Nama minimal 2 huruf").max(100),
   email: z.string().trim().toLowerCase().email("Format email salah").max(255),
-  password: z.string().min(8, "Password minimal 8 karakter").max(100),
+  password: z
+    .string()
+    .min(8, "Password minimal 8 karakter")
+    .refine(passwordWithinBcryptLimit, "Password maksimal 72 byte"),
 });
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email("Format email salah"),
-  password: z.string().min(1, "Password wajib diisi"),
+  password: z
+    .string()
+    .min(1, "Password wajib diisi")
+    .refine(passwordWithinBcryptLimit, "Password maksimal 72 byte"),
 });
 
 router.post("/register", batasAuth, async (req, res) => {
@@ -42,7 +55,7 @@ router.post("/register", batasAuth, async (req, res) => {
     return;
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
   const user = await prisma.user.create({
     data: { name, email, passwordHash },
     select: { id: true, name: true, email: true },
@@ -68,9 +81,10 @@ router.post("/login", batasAuth, async (req, res) => {
   const { email, password } = parsed.data;
 
   const user = await prisma.user.findUnique({ where: { email } });
-  const cocok = user
-    ? await bcrypt.compare(password, user.passwordHash)
-    : false;
+  const cocok = await bcrypt.compare(
+    password,
+    user?.passwordHash ?? DUMMY_PASSWORD_HASH,
+  );
   if (!user || !cocok) {
     res
       .status(401)

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
+import { BATAS_HALAMAN } from "../lib/batasInput.js";
 import { requireAuth } from "../middleware/auth.js";
 import { ambilKamus, koreksiKalimat } from "../lib/koreksiTypo.js";
 import { createEmbedding, generateText, kirimErrorAi, AiError } from "../services/ai.service.js";
@@ -71,6 +72,21 @@ const askBodySchema = z.object({
     .trim()
     .min(2, "Pertanyaan minimal 2 karakter")
     .max(1000, "Pertanyaan maksimal 1000 karakter"),
+});
+
+const conversationsQuerySchema = z.object({
+  limit: z.coerce
+    .number()
+    .int("Limit harus bilangan bulat")
+    .min(1, "Limit minimal 1")
+    .max(50, "Limit maksimal 50")
+    .default(20),
+  page: z.coerce
+    .number()
+    .int("Page harus bilangan bulat")
+    .min(1, "Page minimal 1")
+    .max(BATAS_HALAMAN, `Page maksimal ${BATAS_HALAMAN}`)
+    .default(1),
 });
 
 /**
@@ -323,12 +339,19 @@ router.post("/ask", batasAiHarian, batasAiPerMenit, async (req, res) => {
  */
 router.get("/conversations", async (req, res) => {
   const userId = req.userId!;
-
-  const limitParam = parseInt(req.query.limit as string, 10);
-  const pageParam = parseInt(req.query.page as string, 10);
-
-  const limit = Number.isFinite(limitParam) && limitParam >= 1 && limitParam <= 50 ? limitParam : 20;
-  const page = Number.isFinite(pageParam) && pageParam >= 1 ? pageParam : 1;
+  const parsedQuery = conversationsQuerySchema.safeParse(req.query);
+  if (!parsedQuery.success) {
+    res.status(422).json({
+      success: false,
+      message: "Parameter halaman tidak valid.",
+      errors: parsedQuery.error.issues.map((issue) => ({
+        field: issue.path.join("."),
+        message: issue.message,
+      })),
+    });
+    return;
+  }
+  const { limit, page } = parsedQuery.data;
   const skip = (page - 1) * limit;
 
   try {

@@ -7,12 +7,12 @@ Dokumen ini mencatat bug, kendala, atau hal yang tidak semestinya ditemukan sela
 
 ## Ringkasan Bug
 
-| Tingkat | Terbuka | Diperbaiki di 5.1 | Dipindah ke Task Lain | Total |
+| Tingkat | Terbuka | Diperbaiki | Dipindah ke Task Lain | Total |
 | :--- | :---: | :---: | :---: | :---: |
 | **P1** (Kritis / Bocor Data / Rusak Total) | 0 | 1 | 0 | 1 |
-| **P2** (Fitur Bermasalah / Membingungkan)   | 0 | 3 | 0 | 3 |
-| **P3** (Kosmetik / Tampilan / Bahasa)       | 0 | 0 | 0 | 0 |
-| **Total**                                   | **0** | **4** | **0** | **4** |
+| **P2** (Fitur Bermasalah / Membingungkan)   | 0 | 6 | 0 | 6 |
+| **P3** (Kosmetik / Tampilan / Bahasa)       | 0 | 4 | 3 | 7 |
+| **Total**                                   | **0** | **11** | **3** | **14** |
 
 ---
 
@@ -59,3 +59,83 @@ Dokumen ini mencatat bug, kendala, atau hal yang tidak semestinya ditemukan sela
 - **Hasil yang Terjadi**: Kartu menampilkan checkbox, tombol ubah, dan tombol hapus terus-menerus; halaman `/notes/[id]` langsung membuka editor.
 - **Status**: Diperbaiki pada perubahan daftar catatan modern.
 - **Task Terkait**: Task antarmuka daftar catatan
+
+### B-05 Server Produksi Tidak Memvalidasi Panjang JWT Secret Saat Startup
+- **Tingkat**: P2
+- **Langkah Mengulang**:
+  1. Jalankan backend dengan `NODE_ENV=production` dan `JWT_SECRET` kosong atau kurang dari 32 karakter.
+- **Hasil yang Diharapkan**: Server menolak untuk berjalan tanpa mencetak nilai secret.
+- **Hasil yang Terjadi**: Sebelumnya server dapat mulai tanpa pemeriksaan panjang secret saat startup.
+- **Dugaan File Penyebab**: `backend/src/lib/jwt.ts`, `backend/src/index.ts`
+- **Status**: Diperbaiki di Task 5.3 (startup produksi berhenti jika secret tidak valid; development memberi peringatan tanpa nilai secret).
+- **Task Terkait**: Task 5.3
+
+### B-06 Temuan Audit Dependensi DoS Ditunda untuk Tinjauan Kompatibilitas
+- **Tingkat**: P3
+- **Langkah Mengulang**:
+  1. Jalankan `npm audit` dari folder backend dan frontend.
+- **Hasil yang Diharapkan**: Tidak ada temuan dependensi yang berisiko untuk aplikasi.
+- **Hasil yang Terjadi**: Audit melaporkan 3 temuan High pada rantai Prisma/deepmerge-ts dan 7 Moderate pada rantai minimatch; peninjauan menggolongkannya sebagai risiko DoS berisiko rendah.
+- **Dugaan File Penyebab**: Lockfile backend dan frontend.
+- **Status**: Ditunda ke Task 5.6 untuk ditinjau dan diperbarui tanpa memaksa perubahan mayor.
+- **Task Terkait**: Task 5.3 / Task 5.6
+
+### B-07 Password Lebih dari 72 Byte Dapat Terpotong oleh bcrypt
+- **Tingkat**: P2
+- **Langkah Mengulang**:
+  1. Kirim password yang panjangnya lebih dari 72 byte pada daftar atau login.
+- **Hasil yang Diharapkan**: Password di luar batas ditolak sebelum diproses bcrypt.
+- **Hasil yang Terjadi**: Sebelumnya daftar hanya membatasi jumlah karakter dan login tidak membatasi panjang; bcrypt memakai maksimal 72 byte pertama.
+- **Dugaan File Penyebab**: `backend/src/routes/auth.ts`
+- **Status**: Diperbaiki di Task 5.3 dengan validasi 72 byte UTF-8 untuk daftar dan login. Uji router terisolasi: 72 byte diterima dan 75 byte ditolak 422.
+- **Task Terkait**: Task 5.3
+
+### B-08 Perbedaan Jalur Login Membuka Risiko Enumerasi Waktu
+- **Tingkat**: P2
+- **Langkah Mengulang**:
+  1. Bandingkan login email yang tidak terdaftar dengan email terdaftar yang memakai password salah.
+- **Hasil yang Diharapkan**: Kedua jalur melakukan perbandingan hash dengan biaya yang setara.
+- **Hasil yang Terjadi**: Sebelumnya jalur email yang tidak ada melewati `bcrypt.compare`.
+- **Dugaan File Penyebab**: `backend/src/routes/auth.ts`
+- **Status**: Diperbaiki di Task 5.3 dengan hash dummy berbiaya sama. Uji router terisolasi memastikan pesan/status sama dan `bcrypt.compare` berjalan pada kedua jalur; benchmark waktu belum dilakukan.
+- **Task Terkait**: Task 5.3
+
+### B-09 Token Pengguna yang Sudah Tidak Ada Mendapat 404
+- **Tingkat**: P3
+- **Langkah Mengulang**:
+  1. Akses `/auth/me` memakai token bertanda tangan valid yang mengarah ke pengguna yang sudah dihapus.
+- **Hasil yang Diharapkan**: Respons 401, sama dengan sesi tidak valid.
+- **Hasil yang Terjadi**: Middleware menerima token; `/auth/me` mengembalikan 404 saat pengguna tidak ditemukan.
+- **Dugaan File Penyebab**: `backend/src/middleware/auth.ts`, `backend/src/routes/auth.ts`
+- **Status**: Ditunda ke Task 5.6; tidak mengembalikan data pengguna.
+- **Task Terkait**: Task 5.3 / Task 5.6
+
+### B-10 Rute Logout Publik Hanya Memberi Respons Sukses
+- **Tingkat**: P3
+- **Langkah Mengulang**:
+  1. Kirim `POST /auth/logout` tanpa token.
+- **Hasil yang Diharapkan**: Rute data selain login, daftar, dan health memerlukan autentikasi.
+- **Hasil yang Terjadi**: Rute logout no-op merespons 200 tanpa membaca atau mengubah data.
+- **Dugaan File Penyebab**: `backend/src/routes/auth.ts`
+- **Status**: Diterima sementara dan ditunda ke Task 5.6; logout klien tetap menghapus token lokal.
+- **Task Terkait**: Task 5.3 / Task 5.6
+
+### B-11 Parameter Halaman Tidak Memiliki Batas Maksimum
+- **Tingkat**: P3
+- **Langkah Mengulang**:
+  1. Kirim `page` yang sangat besar pada daftar catatan atau percakapan asisten.
+- **Hasil yang Diharapkan**: Parameter halaman di luar batas ditolak sebelum query database.
+- **Hasil yang Terjadi**: Sebelumnya tidak ada batas maksimum, sehingga offset query dapat menjadi sangat besar.
+- **Dugaan File Penyebab**: `backend/src/routes/notes.ts`, `backend/src/routes/assistant.ts`
+- **Status**: Diperbaiki di Task 5.3; halaman maksimum 10.000. Uji router lokal mendapat 422 untuk 10.001 tanpa query database.
+- **Task Terkait**: Task 5.3
+
+### B-12 Filter Tag Tidak Membatasi Panjang Nilai
+- **Tingkat**: P3
+- **Langkah Mengulang**:
+  1. Kirim filter tag lebih dari 30 karakter pada daftar catatan atau graph.
+- **Hasil yang Diharapkan**: Filter dengan panjang di luar batas tag tersimpan ditolak.
+- **Hasil yang Terjadi**: Sebelumnya query tag pada daftar catatan dan graph tidak memiliki batas panjang.
+- **Dugaan File Penyebab**: `backend/src/routes/notes.ts`, `backend/src/routes/graph.ts`
+- **Status**: Diperbaiki di Task 5.3; tag dibatasi 30 karakter. Uji router lokal mendapat 422 untuk 31 karakter.
+- **Task Terkait**: Task 5.3
