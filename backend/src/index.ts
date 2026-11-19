@@ -7,6 +7,7 @@ import graphRoutes from "./routes/graph.js";
 import assistantRoutes from "./routes/assistant.js";
 import { prisma } from "./lib/prisma.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
+import { batasUmum } from "./middleware/rateLimit.js";
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -35,6 +36,9 @@ app.use(
 );
 
 app.use(express.json({ limit: "1mb" }));
+
+// Terapkan batas laju umum untuk seluruh /api/v1 (300 req / 15 menit per IP)
+app.use("/api/v1", batasUmum);
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/notes", notesRoutes);
