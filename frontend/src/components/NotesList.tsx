@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { createPortal } from "react-dom";
 import { useRequireAuth } from "@/lib/useRequireAuth";
 import { AppShell } from "@/components/AppShell";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -67,7 +68,14 @@ export function NotesList() {
   const [errorMessage, setErrorMessage] = useState("");
 
   // State untuk mode pilih catatan (Merge Catatan)
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
+
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ left: number; top: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const menuItemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   // Hapus catatan modal state
   const [noteToDelete, setNoteToDelete] = useState<NoteItem | null>(null);
@@ -75,6 +83,15 @@ export function NotesList() {
 
   // Counter untuk cegah balapan respons (race condition)
   const requestIdRef = useRef(0);
+
+  const selectionContext = `${paramPage}|${paramSearch}|${paramTag}|${paramSort}`;
+  const [previousSelectionContext, setPreviousSelectionContext] = useState(selectionContext);
+  if (previousSelectionContext !== selectionContext) {
+    setPreviousSelectionContext(selectionContext);
+    setIsSelectionMode(false);
+    setSelectedNoteIds([]);
+    setOpenMenuId(null);
+  }
 
   // Fungsi pembantu memperbarui search params di URL
   const updateQueryParams = useCallback(
@@ -225,6 +242,41 @@ export function NotesList() {
     };
   }, [user, paramPage, paramSearch, paramTag, paramSort]);
 
+  useEffect(() => {
+    if (!openMenuId) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (
+        target instanceof Node &&
+        !menuRef.current?.contains(target) &&
+        !menuTriggerRef.current?.contains(target)
+      ) {
+        setOpenMenuId(null);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpenMenuId(null);
+        menuTriggerRef.current?.focus();
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [openMenuId]);
+
+  useEffect(() => {
+    if (openMenuId) {
+      menuItemRefs.current[0]?.focus();
+    }
+  }, [openMenuId, menuPosition]);
+
   // Fungsi toggle pilihan catatan untuk gabung
   function toggleSelectNote(id: string) {
     setSelectedNoteIds((prev) => {
@@ -236,6 +288,61 @@ export function NotesList() {
       }
       return [...prev, id];
     });
+  }
+
+  function toggleNoteMenu(noteId: string, trigger: HTMLButtonElement) {
+    if (openMenuId === noteId) {
+      setOpenMenuId(null);
+      return;
+    }
+
+    const rect = trigger.getBoundingClientRect();
+    const menuWidth = 208;
+    const menuHeight = 152;
+    const margin = 8;
+    const left = Math.max(
+      margin,
+      Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - margin),
+    );
+    let top = rect.bottom + margin;
+    if (top + menuHeight > window.innerHeight - margin) {
+      top = Math.max(margin, rect.top - menuHeight - margin);
+    }
+
+    menuTriggerRef.current = trigger;
+    setMenuPosition({ left, top });
+    setOpenMenuId(noteId);
+  }
+
+  function handleMenuKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const items = menuItemRefs.current.filter(
+      (item): item is HTMLButtonElement => item !== null,
+    );
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const direction = event.key === "ArrowDown" ? 1 : -1;
+      const nextIndex = (currentIndex + direction + items.length) % items.length;
+      items[nextIndex]?.focus();
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      items[0]?.focus();
+    } else if (event.key === "End") {
+      event.preventDefault();
+      items[items.length - 1]?.focus();
+    }
+  }
+
+  function startSelectionWith(noteId: string) {
+    setSelectedNoteIds([noteId]);
+    setIsSelectionMode(true);
+    setOpenMenuId(null);
+  }
+
+  function leaveSelectionMode() {
+    setSelectedNoteIds([]);
+    setIsSelectionMode(false);
   }
 
   // Handle konfirmasi hapus catatan
@@ -253,6 +360,11 @@ export function NotesList() {
 
       if (res.ok) {
         setNoteToDelete(null);
+        const remainingSelections = selectedNoteIds.filter((id) => id !== noteToDelete.id);
+        setSelectedNoteIds(remainingSelections);
+        if (remainingSelections.length === 0) {
+          setIsSelectionMode(false);
+        }
         await fetchTags();
 
         // Jika catatan yang dihapus adalah satu-satunya di halaman saat ini dan bukan hal 1, mundur
@@ -283,6 +395,7 @@ export function NotesList() {
   }
 
   const hasFilterActive = Boolean(paramSearch || paramTag || paramSort !== "terbaru");
+  const openMenuNote = notes.find((note) => note.id === openMenuId);
 
   function resetFilter() {
     setSearchInput("");
@@ -424,39 +537,35 @@ export function NotesList() {
         )}
 
         {/* Bilah Aksi Gabungkan Catatan dengan AI */}
-        {selectedNoteIds.length > 0 && (
+        {isSelectionMode && (
           <div className="sticky top-20 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
             <div className="flex items-center gap-2 text-sm font-semibold text-indigo-900">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs text-white">
                 {selectedNoteIds.length}
               </span>
-              <span>
-                {selectedNoteIds.length} catatan dipilih (maksimal 5 pada halaman ini)
-              </span>
+              <span>{selectedNoteIds.length} dipilih</span>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setSelectedNoteIds([])}
+                onClick={leaveSelectionMode}
                 className="inline-flex min-h-[36px] items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
               >
                 Batal
               </button>
-              <Link
-                href={`/notes/merge?ids=${selectedNoteIds.join(",")}`}
-                className={`inline-flex min-h-[36px] items-center justify-center rounded-lg px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors ${
-                  selectedNoteIds.length >= 2
-                    ? "bg-indigo-600 hover:bg-indigo-700"
-                    : "bg-indigo-400 cursor-not-allowed pointer-events-none"
-                }`}
-                title={
-                  selectedNoteIds.length < 2
-                    ? "Pilih minimal 2 catatan untuk digabung"
-                    : "Gabungkan catatan yang dipilih"
-                }
+              <button
+                type="button"
+                disabled={selectedNoteIds.length < 2}
+                onClick={() => {
+                  const mergeUrl = `/notes/merge?ids=${selectedNoteIds.join(",")}`;
+                  leaveSelectionMode();
+                  router.push(mergeUrl);
+                }}
+                className="inline-flex min-h-[36px] items-center justify-center rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-400"
+                title={selectedNoteIds.length < 2 ? "Pilih minimal 2 catatan untuk digabung" : "Gabungkan catatan yang dipilih"}
               >
                 Gabungkan dengan AI
-              </Link>
+              </button>
             </div>
           </div>
         )}
@@ -551,78 +660,92 @@ export function NotesList() {
               return (
                 <div
                   key={note.id}
-                  className={`flex flex-col justify-between rounded-2xl bg-white p-5 shadow-sm ring-1 transition hover:shadow-md ${
+                  className={`relative flex flex-col justify-between rounded-2xl bg-white p-5 shadow-sm ring-1 transition hover:shadow-md ${
                     isSelected
                       ? "ring-2 ring-indigo-600 bg-indigo-50/20"
                       : "ring-slate-200"
                   }`}
                 >
-                  <div>
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <h2 className="text-lg font-bold text-slate-900 line-clamp-1 flex-1">
-                        {note.title}
-                      </h2>
-                      <label
-                        className="inline-flex items-center gap-1.5 cursor-pointer text-xs text-slate-500 hover:text-indigo-600"
-                        title={
-                          reachedLimit
-                            ? "Maksimal 5 catatan sekaligus"
-                            : "Pilih untuk digabung"
-                        }
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          disabled={reachedLimit}
-                          onChange={() => toggleSelectNote(note.id)}
-                          className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 disabled:opacity-40"
-                        />
-                        <span className="sr-only">Pilih catatan {note.title}</span>
-                      </label>
-                    </div>
-
-                    <p className="mt-2 text-sm text-slate-600 line-clamp-3 whitespace-pre-wrap">
-                    {note.summary || note.contentPreview || "Tidak ada isi teks."}
-                  </p>
-
-                  {note.tags && note.tags.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {note.tags.map((tag) => (
-                        <button
-                          key={tag}
-                          type="button"
-                          onClick={() => updateQueryParams({ tag, page: 1 })}
-                          className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
-                        >
-                          #{tag}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-3">
-                  <span className="text-xs text-slate-400">
-                    {formatDate(note.updatedAt)}
-                  </span>
-
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={`/notes/${note.id}`}
-                      className="inline-flex min-h-[36px] items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-                    >
-                      Ubah
-                    </Link>
+                  {isSelectionMode ? (
                     <button
                       type="button"
-                      onClick={() => setNoteToDelete(note)}
-                      className="inline-flex min-h-[36px] items-center justify-center rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 hover:border-red-300"
-                    >
-                      Hapus
-                    </button>
+                      disabled={reachedLimit}
+                      aria-label={`${isSelected ? "Batalkan pilihan" : "Pilih"} catatan ${note.title}`}
+                      aria-pressed={isSelected}
+                      onClick={() => toggleSelectNote(note.id)}
+                      className="absolute inset-0 z-0 rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed"
+                    />
+                  ) : (
+                    <Link
+                      href={`/notes/${note.id}`}
+                      aria-label={`Buka catatan ${note.title}`}
+                      className="absolute inset-0 z-0 rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600"
+                    />
+                  )}
+
+                  <div className="relative z-10 flex h-full flex-col justify-between pointer-events-none">
+                    <div>
+                      <div className="mb-2 flex items-start justify-between gap-3">
+                        <h2 className="line-clamp-1 flex-1 text-lg font-bold text-slate-900">
+                          {note.title}
+                        </h2>
+                        <div className="flex items-center gap-2">
+                          {isSelectionMode && (
+                            <label className="pointer-events-auto inline-flex min-h-9 min-w-9 cursor-pointer items-center justify-center rounded-lg text-slate-500 hover:bg-indigo-50">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                disabled={reachedLimit}
+                                onChange={() => toggleSelectNote(note.id)}
+                                aria-label={`${isSelected ? "Batalkan pilihan" : "Pilih"} catatan ${note.title}`}
+                                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 disabled:opacity-40"
+                              />
+                            </label>
+                          )}
+                          <button
+                            type="button"
+                            aria-label={`Menu tindakan untuk ${note.title}`}
+                            aria-haspopup="menu"
+                            aria-expanded={openMenuId === note.id}
+                            aria-controls={openMenuId === note.id ? `note-menu-${note.id}` : undefined}
+                            onClick={(event) => toggleNoteMenu(note.id, event.currentTarget)}
+                            className="pointer-events-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xl leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600"
+                          >
+                            <span aria-hidden="true">⋯</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm text-slate-600">
+                        {note.summary || note.contentPreview || "Tidak ada isi teks."}
+                      </p>
+
+                      {note.tags && note.tags.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {note.tags.map((tag) => (
+                            <button
+                              key={tag}
+                              type="button"
+                              onClick={() => updateQueryParams({ tag, page: 1 })}
+                              className="pointer-events-auto rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                            >
+                              #{tag}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-3">
+                      <span className="text-xs text-slate-400">
+                        {formatDate(note.updatedAt)}
+                      </span>
+                      {isSelectionMode && reachedLimit && (
+                        <span className="text-xs text-slate-400">Maksimal 5 pilihan</span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
             );
           })}
         </div>
@@ -650,6 +773,65 @@ export function NotesList() {
         onConfirm={handleConfirmDelete}
         onCancel={() => setNoteToDelete(null)}
       />
+      {openMenuNote && menuPosition && typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={menuRef}
+            id={`note-menu-${openMenuNote.id}`}
+            role="menu"
+            aria-label={`Menu tindakan untuk ${openMenuNote.title}`}
+            onKeyDown={handleMenuKeyDown}
+            onBlur={(event) => {
+              if (
+                event.relatedTarget instanceof Node &&
+                !event.currentTarget.contains(event.relatedTarget)
+              ) {
+                setOpenMenuId(null);
+              }
+            }}
+            style={{ left: menuPosition.left, top: menuPosition.top }}
+            className="fixed z-[70] w-52 rounded-xl bg-white p-1 shadow-xl ring-1 ring-slate-200"
+          >
+            <button
+              ref={(element) => { menuItemRefs.current[0] = element; }}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                leaveSelectionMode();
+                setOpenMenuId(null);
+                router.push(`/notes/${openMenuNote.id}?edit=true`);
+              }}
+              className="flex min-h-10 w-full items-center rounded-lg px-3 text-left text-sm text-slate-700 hover:bg-slate-100 focus:bg-slate-100 focus:outline-none"
+            >
+              Ubah
+            </button>
+            <button
+              ref={(element) => { menuItemRefs.current[1] = element; }}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                startSelectionWith(openMenuNote.id);
+                menuTriggerRef.current?.focus();
+              }}
+              className="flex min-h-10 w-full items-center rounded-lg px-3 text-left text-sm text-slate-700 hover:bg-slate-100 focus:bg-slate-100 focus:outline-none"
+            >
+              Gabungkan dengan…
+            </button>
+            <button
+              ref={(element) => { menuItemRefs.current[2] = element; }}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpenMenuId(null);
+                setNoteToDelete(openMenuNote);
+              }}
+              className="flex min-h-10 w-full items-center rounded-lg px-3 text-left text-sm text-red-600 hover:bg-red-50 focus:bg-red-50 focus:outline-none"
+            >
+              Hapus
+            </button>
+          </div>,
+          document.body,
+        )}
     </AppShell>
   );
 }

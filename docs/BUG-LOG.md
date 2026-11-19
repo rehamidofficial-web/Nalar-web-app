@@ -10,9 +10,9 @@ Dokumen ini mencatat bug, kendala, atau hal yang tidak semestinya ditemukan sela
 | Tingkat | Terbuka | Diperbaiki di 5.1 | Dipindah ke Task Lain | Total |
 | :--- | :---: | :---: | :---: | :---: |
 | **P1** (Kritis / Bocor Data / Rusak Total) | 0 | 1 | 0 | 1 |
-| **P2** (Fitur Bermasalah / Membingungkan)   | 0 | 2 | 0 | 2 |
+| **P2** (Fitur Bermasalah / Membingungkan)   | 0 | 3 | 0 | 3 |
 | **P3** (Kosmetik / Tampilan / Bahasa)       | 0 | 0 | 0 | 0 |
-| **Total**                                   | **0** | **3** | **0** | **3** |
+| **Total**                                   | **0** | **4** | **0** | **4** |
 
 ---
 
@@ -49,3 +49,13 @@ Dokumen ini mencatat bug, kendala, atau hal yang tidak semestinya ditemukan sela
 - **Dugaan File Penyebab**: `frontend/src/components/NoteEditor.tsx`, `frontend/src/app/notes/new/page.tsx`
 - **Status**: Diperbaiki di 5.1 (reset state lokal setelah submit berhasil dan pemberian `key="new-note"` pada instance NoteEditor).
 - **Task Terkait**: Task 5.1
+
+### B-04 Daftar Catatan Belum Memiliki Halaman Baca dan Aksi Kartu yang Ringkas
+- **Tingkat**: P2
+- **Langkah Mengulang**:
+  1. Buka halaman `/notes`.
+  2. Coba membuka catatan dengan mengeklik bagian kartu selain tombol tindakan.
+- **Hasil yang Diharapkan**: Seluruh kartu dapat dibuka ke halaman baca, dan aksi ubah, gabung, serta hapus tersedia dari menu titik tiga.
+- **Hasil yang Terjadi**: Kartu menampilkan checkbox, tombol ubah, dan tombol hapus terus-menerus; halaman `/notes/[id]` langsung membuka editor.
+- **Status**: Diperbaiki pada perubahan daftar catatan modern.
+- **Task Terkait**: Task antarmuka daftar catatan
