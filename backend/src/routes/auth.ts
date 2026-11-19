@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { signToken } from "../lib/jwt.js";
 import { requireAuth } from "../middleware/auth.js";
+import { batasAuth } from "../middleware/rateLimit.js";
 
 const router = Router();
 
@@ -18,7 +19,7 @@ const loginSchema = z.object({
   password: z.string().min(1, "Password wajib diisi"),
 });
 
-router.post("/register", async (req, res) => {
+router.post("/register", batasAuth, async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(422).json({
@@ -51,7 +52,7 @@ router.post("/register", async (req, res) => {
     .json({ success: true, message: "Registrasi berhasil", data: { user } });
 });
 
-router.post("/login", async (req, res) => {
+router.post("/login", batasAuth, async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(422).json({

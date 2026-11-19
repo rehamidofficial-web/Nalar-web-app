@@ -100,8 +100,8 @@ function handleApiError(error: any): never {
     error?.name === "AbortError"
   ) {
     throw new AiError(
-      502,
-      "Layanan AI tidak merespons. Coba lagi sebentar lagi.",
+      504,
+      "AI terlalu lama menjawab. Coba lagi.",
       error?.message
     );
   }

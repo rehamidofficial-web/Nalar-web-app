@@ -5,6 +5,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { createEmbedding, kirimErrorAi, AiError } from "../services/ai.service.js";
 import { cariCatatanMirip } from "../services/vector.service.js";
 import { ambilKamus, koreksiKalimat } from "../lib/koreksiTypo.js";
+import { batasSearchPerMenit, batasAiHarian } from "../middleware/rateLimit.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -49,58 +50,6 @@ function setCachedEmbedding(userId: string, query: string, embedding: number[]) 
 }
 
 // ---------------------------------------------------------
-// 2. Simple Rate Limiter (15 req/menit, 200 req/hari per user)
-// ---------------------------------------------------------
-interface RateLimitRecord {
-  minuteWindowStart: number;
-  minuteCount: number;
-  dayWindowStart: number;
-  dayCount: number;
-}
-
-const rateLimitMap = new Map<string, RateLimitRecord>();
-
-function checkRateLimit(userId: string): boolean {
-  const now = Date.now();
-  const ONE_MINUTE = 60 * 1000;
-  const ONE_DAY = 24 * 60 * 60 * 1000;
-
-  let record = rateLimitMap.get(userId);
-  if (!record) {
-    record = {
-      minuteWindowStart: now,
-      minuteCount: 1,
-      dayWindowStart: now,
-      dayCount: 1,
-    };
-    rateLimitMap.set(userId, record);
-    return true;
-  }
-
-  // Cek jendela menit
-  if (now - record.minuteWindowStart > ONE_MINUTE) {
-    record.minuteWindowStart = now;
-    record.minuteCount = 1;
-  } else {
-    record.minuteCount += 1;
-  }
-
-  // Cek jendela hari
-  if (now - record.dayWindowStart > ONE_DAY) {
-    record.dayWindowStart = now;
-    record.dayCount = 1;
-  } else {
-    record.dayCount += 1;
-  }
-
-  if (record.minuteCount > 15 || record.dayCount > 200) {
-    return false;
-  }
-
-  return true;
-}
-
-// ---------------------------------------------------------
 // Helper perapian cuplikan (maks 160 karakter)
 // ---------------------------------------------------------
 function buatCuplikan(teks: string, maxLen = 160): string {
@@ -137,21 +86,11 @@ const searchQuerySchema = z.object({
 /**
  * GET /api/v1/search?q=...&limit=10
  */
-router.get("/", async (req, res) => {
+router.get("/", batasAiHarian, batasSearchPerMenit, async (req, res) => {
   const waktuMulai = Date.now();
   const userId = req.userId!;
 
-  // 1. Cek rate limit
-  if (!checkRateLimit(userId)) {
-    res.status(429).json({
-      success: false,
-      message: "Terlalu banyak pencarian. Coba lagi sebentar lagi.",
-      errors: [],
-    });
-    return;
-  }
-
-  // 2. Validasi input
+  // Validasi input
   const parseResult = searchQuerySchema.safeParse(req.query);
   if (!parseResult.success) {
     res.status(422).json({

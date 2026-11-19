@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { ambilKamus, koreksiKalimat } from "../lib/koreksiTypo.js";
 import { createEmbedding, generateText, kirimErrorAi, AiError } from "../services/ai.service.js";
+import { batasAiHarian, batasAiPerMenit } from "../middleware/rateLimit.js";
 import {
   ambilKonteks,
   susunPrompt,
@@ -55,58 +56,6 @@ function setCachedEmbedding(userId: string, text: string, embedding: number[]) {
   });
 }
 
-// ---------------------------------------------------------
-// 2. Simple Rate Limiter (6 req/menit, 60 req/hari per user)
-// ---------------------------------------------------------
-interface RateLimitRecord {
-  minuteWindowStart: number;
-  minuteCount: number;
-  dayWindowStart: number;
-  dayCount: number;
-}
-
-const assistantRateLimitMap = new Map<string, RateLimitRecord>();
-
-function checkAssistantRateLimit(userId: string): boolean {
-  const now = Date.now();
-  const ONE_MINUTE = 60 * 1000;
-  const ONE_DAY = 24 * 60 * 60 * 1000;
-
-  let record = assistantRateLimitMap.get(userId);
-  if (!record) {
-    record = {
-      minuteWindowStart: now,
-      minuteCount: 1,
-      dayWindowStart: now,
-      dayCount: 1,
-    };
-    assistantRateLimitMap.set(userId, record);
-    return true;
-  }
-
-  // Cek jendela menit
-  if (now - record.minuteWindowStart > ONE_MINUTE) {
-    record.minuteWindowStart = now;
-    record.minuteCount = 1;
-  } else {
-    record.minuteCount += 1;
-  }
-
-  // Cek jendela hari
-  if (now - record.dayWindowStart > ONE_DAY) {
-    record.dayWindowStart = now;
-    record.dayCount = 1;
-  } else {
-    record.dayCount += 1;
-  }
-
-  if (record.minuteCount > 6 || record.dayCount > 60) {
-    return false;
-  }
-
-  return true;
-}
-
 // Skema validasi UUID
 const uuidSchema = z.string().uuid("ID percakapan harus berupa UUID yang valid");
 
@@ -128,26 +77,11 @@ const askBodySchema = z.object({
  * 1. POST /api/v1/ai/ask
  * Tanya jawab AI dengan catatan pribadi pengguna sebagai rujukan.
  */
-router.post("/ask", async (req, res) => {
+router.post("/ask", batasAiHarian, batasAiPerMenit, async (req, res) => {
   const waktuMulai = Date.now();
   const userId = req.userId!;
 
-  // 1. Rate limiter check (6/menit, 60/hari)
-  if (!checkAssistantRateLimit(userId)) {
-    res.status(429).json({
-      success: false,
-      message: "Terlalu banyak pertanyaan. Coba lagi sebentar lagi.",
-      errors: [
-        {
-          field: "rateLimit",
-          message: "Batas 6 pertanyaan per menit atau 60 per hari tercapai.",
-        },
-      ],
-    });
-    return;
-  }
-
-  // 2. Validasi body request
+  // Validasi body request
   const parseResult = askBodySchema.safeParse(req.body);
   if (!parseResult.success) {
     res.status(422).json({

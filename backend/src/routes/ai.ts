@@ -5,6 +5,11 @@ import { requireAuth } from "../middleware/auth.js";
 import { generateText, kirimErrorAi } from "../services/ai.service.js";
 import { parseKonsep } from "../lib/parseKonsep.js";
 import { jalankanRelasiKonsepDiLatarBelakang } from "../services/relationship.service.js";
+import {
+  batasAiPerMenit,
+  batasAiHarian,
+  batasAiMergePerMenit,
+} from "../middleware/rateLimit.js";
 
 const router = Router();
 
@@ -27,7 +32,7 @@ const SYSTEM_PROMPT_CONCEPTS =
  * POST /api/v1/ai/summarize
  * Meringkas catatan pengguna menggunakan AI
  */
-router.post("/summarize", async (req, res) => {
+router.post("/summarize", batasAiHarian, batasAiPerMenit, async (req, res) => {
   const parsedBody = aiNoteActionSchema.safeParse(req.body);
   if (!parsedBody.success) {
     res.status(422).json({
@@ -126,7 +131,7 @@ router.post("/summarize", async (req, res) => {
  * POST /api/v1/ai/extract-concepts
  * Mengekstrak konsep utama dari catatan pengguna menggunakan AI
  */
-router.post("/extract-concepts", async (req, res) => {
+router.post("/extract-concepts", batasAiHarian, batasAiPerMenit, async (req, res) => {
   const parsedBody = aiNoteActionSchema.safeParse(req.body);
   if (!parsedBody.success) {
     res.status(422).json({
@@ -309,29 +314,6 @@ router.post("/extract-concepts", async (req, res) => {
   }
 });
 
-// ---------------------------------------------------------
-// Rate Limiter Sederhana untuk Merge-Preview (6 req/menit per user)
-// ---------------------------------------------------------
-const mergePreviewRateLimitMap = new Map<string, { start: number; count: number }>();
-
-function checkMergeRateLimit(userId: string): boolean {
-  const now = Date.now();
-  const ONE_MINUTE = 60 * 1000;
-  const record = mergePreviewRateLimitMap.get(userId);
-
-  if (!record || now - record.start > ONE_MINUTE) {
-    mergePreviewRateLimitMap.set(userId, { start: now, count: 1 });
-    return true;
-  }
-
-  if (record.count >= 6) {
-    return false;
-  }
-
-  record.count += 1;
-  return true;
-}
-
 const mergePreviewSchema = z.object({
   noteIds: z
     .array(z.string().uuid("ID catatan harus berupa UUID yang valid"))
@@ -394,23 +376,9 @@ function parseHasilMerge(teks: string): { title: string; content: string } | nul
  * POST /api/v1/ai/merge-preview
  * Menggabungkan 2 sampai 5 catatan menjadi rancangan baru dengan AI (1 panggilan Gemini)
  */
-router.post("/merge-preview", async (req, res) => {
+router.post("/merge-preview", batasAiHarian, batasAiMergePerMenit, async (req, res) => {
   const waktuMulai = Date.now();
   const userId = req.userId!;
-
-  if (!checkMergeRateLimit(userId)) {
-    res.status(429).json({
-      success: false,
-      message: "Terlalu banyak permintaan pembuatan rancangan. Coba lagi sebentar lagi.",
-      errors: [
-        {
-          field: "rateLimit",
-          message: "Batas 6 penggabungan per menit tercapai.",
-        },
-      ],
-    });
-    return;
-  }
 
   const parseResult = mergePreviewSchema.safeParse(req.body);
   if (!parseResult.success) {
