@@ -1,4 +1,4 @@
-import { rateLimit } from "express-rate-limit";
+import { rateLimit, ipKeyGenerator } from "express-rate-limit";
 import type { Request, Response, NextFunction } from "express";
 
 // Catatan arsitektur untuk Task 5.8:
@@ -10,9 +10,10 @@ import type { Request, Response, NextFunction } from "express";
  */
 function buatHandlerBatas(pesanDefault: string, isHarian = false) {
   return (req: Request, res: Response, _next: NextFunction, options: any) => {
-    const sisaDetik = Math.ceil(
-      ((req as any).rateLimit?.resetTime?.getTime() - Date.now()) / 1000
-    ) || 60;
+    const sisaDetik =
+      Math.ceil(
+        ((req as any).rateLimit?.resetTime?.getTime() - Date.now()) / 1000,
+      ) || 60;
 
     const pesan = isHarian
       ? "Batas pemakaian AI hari ini sudah tercapai. Coba lagi besok."
@@ -53,9 +54,13 @@ export const batasAuth = rateLimit({
 
 /**
  * Key generator berdasarkan userId dari JWT auth
+ * Fallback ke ipKeyGenerator agar subnet IPv6 ditangani dengan aman
  */
 function getUserIdKey(req: Request): string {
-  return req.userId || req.ip || "unknown";
+  if (req.userId) {
+    return req.userId;
+  }
+  return req.ip ? ipKeyGenerator(req.ip) : "unknown";
 }
 
 /**
