@@ -282,7 +282,7 @@ router.get("/", batasAiHarian, batasSearchPerMenit, async (req, res) => {
     });
     return;
   } catch (error: any) {
-    console.error("[Search Error]", error?.name, error?.message);
+    console.error("[Search Error]", error?.name || "UnknownError");
     res.status(500).json({
       success: false,
       message: "Terjadi kesalahan saat memproses pencarian.",

@@ -324,7 +324,7 @@ router.post("/ask", batasAiHarian, batasAiPerMenit, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("[Asisten Error]", error);
+    console.error("[Asisten Error]", error instanceof Error ? error.name : "UnknownError");
     res.status(500).json({
       success: false,
       message: "Terjadi kesalahan internal saat memproses pertanyaan.",
@@ -393,7 +393,7 @@ router.get("/conversations", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("[Get Conversations Error]", error);
+    console.error("[Get Conversations Error]", error instanceof Error ? error.name : "UnknownError");
     res.status(500).json({
       success: false,
       message: "Gagal mengambil daftar percakapan.",
@@ -462,7 +462,7 @@ router.get("/conversations/:id", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("[Get Single Conversation Error]", error);
+    console.error("[Get Single Conversation Error]", error instanceof Error ? error.name : "UnknownError");
     res.status(500).json({
       success: false,
       message: "Gagal mengambil percakapan.",
@@ -518,7 +518,7 @@ router.delete("/conversations/:id", async (req, res) => {
       data: null,
     });
   } catch (error) {
-    console.error("[Delete Conversation Error]", error);
+    console.error("[Delete Conversation Error]", error instanceof Error ? error.name : "UnknownError");
     res.status(500).json({
       success: false,
       message: "Gagal menghapus percakapan.",

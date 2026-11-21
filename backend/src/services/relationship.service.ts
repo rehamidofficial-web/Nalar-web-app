@@ -232,7 +232,7 @@ export async function jalankanRelasiDiLatarBelakang(
     const { similar, concept } = await hitungSemuaRelasiCatatan(userId, noteId, ambang);
     console.log(`[Relasi] catatan=${noteId}, similar=${similar}, concept=${concept}`);
   } catch (error: any) {
-    console.error(`[Relasi] Gagal menghitung relasi catatan ${noteId}:`, error?.message);
+    console.error(`[Relasi] Gagal menghitung relasi catatan ${noteId}:`, error instanceof Error ? error.name : "UnknownError");
   }
 }
 
@@ -247,6 +247,6 @@ export async function jalankanRelasiKonsepDiLatarBelakang(
     const concept = await hitungRelasiKonsep(userId, noteId);
     console.log(`[Relasi Konsep] catatan=${noteId}, concept=${concept}`);
   } catch (error: any) {
-    console.error(`[Relasi Konsep] Gagal menghitung relasi konsep catatan ${noteId}:`, error?.message);
+    console.error(`[Relasi Konsep] Gagal menghitung relasi konsep catatan ${noteId}:`, error instanceof Error ? error.name : "UnknownError");
   }
 }

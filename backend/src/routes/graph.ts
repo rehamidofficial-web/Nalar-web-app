@@ -191,7 +191,7 @@ router.get("/", async (req, res) => {
     });
     return;
   } catch (error) {
-    console.error("[Graph Error]", error);
+    console.error("[Graph Error]", error instanceof Error ? error.name : "UnknownError");
     res.status(500).json({
       success: false,
       message: "Gagal memuat graph catatan.",
@@ -394,7 +394,7 @@ router.get("/:noteId", async (req, res) => {
     });
     return;
   } catch (error) {
-    console.error("[Graph Single Note Error]", error);
+    console.error("[Graph Single Note Error]", error instanceof Error ? error.name : "UnknownError");
     res.status(500).json({
       success: false,
       message: "Gagal memuat graph catatan.",

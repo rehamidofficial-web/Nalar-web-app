@@ -1,6 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { cariCatatanMirip } from "./vector.service.js";
-import { potongTeks } from "./ai.service.js";
+import { netralkanPenandaCatatan, potongTeks } from "./ai.service.js";
 
 // Konstanta batas konteks dan riwayat sesuai spesifikasi Task 4.7
 export const JUMLAH_KONTEKS = 5; // Catatan maksimal yang diambil
@@ -132,9 +132,9 @@ export function susunPrompt(params: {
   // Susun bagian catatan dengan pembatas aman
   const daftarCatatan = konteks
     .map((c, index) => {
-      // Netralkan penanda pembatas dari isi catatan agar tidak merusak format
-      const kontenBersih = c.content.replace(/<<<CATATAN/g, "").replace(/CATATAN>>>/g, "");
-      return `[${index + 1}] Judul: ${c.title}\n<<<CATATAN\n${kontenBersih}\nCATATAN>>>`;
+      const judulBersih = netralkanPenandaCatatan(c.title);
+      const kontenBersih = netralkanPenandaCatatan(c.content);
+      return `[${index + 1}] <<<CATATAN\nJudul: ${judulBersih}\nIsi:\n${kontenBersih}\nCATATAN>>>`;
     })
     .join("\n\n");
 

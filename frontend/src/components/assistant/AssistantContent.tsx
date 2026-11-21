@@ -455,6 +455,9 @@ export function AssistantContent() {
                   <p className="text-xs text-slate-500 mt-1">
                     Aku akan mencari catatanmu yang relevan dan menjawab pertanyaanmu secara akurat.
                   </p>
+                  <p className="text-[11px] text-slate-400 mt-2">
+                    Catatan yang dikirim ke AI diproses oleh penyedia AI. Hindari mengirim informasi sensitif.
+                  </p>
                 </div>
 
                 <div className="space-y-2 pt-2 text-left">

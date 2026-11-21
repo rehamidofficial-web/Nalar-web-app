@@ -50,7 +50,7 @@ router.get("/stats", async (req, res) => {
     });
     return;
   } catch (err) {
-    console.error("Error mengambil stats dashboard:", err);
+    console.error("Error mengambil stats dashboard:", err instanceof Error ? err.name : "UnknownError");
     res.status(500).json({
       success: false,
       message: "Gagal mengambil statistik dashboard",
@@ -111,7 +111,7 @@ router.get("/recent-notes", async (req, res) => {
     });
     return;
   } catch (err) {
-    console.error("Error mengambil catatan terbaru dashboard:", err);
+    console.error("Error mengambil catatan terbaru dashboard:", err instanceof Error ? err.name : "UnknownError");
     res.status(500).json({
       success: false,
       message: "Gagal mengambil catatan terbaru",

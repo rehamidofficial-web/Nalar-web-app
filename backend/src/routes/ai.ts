@@ -2,7 +2,11 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
-import { generateText, kirimErrorAi } from "../services/ai.service.js";
+import {
+  generateText,
+  kirimErrorAi,
+  netralkanPenandaCatatan,
+} from "../services/ai.service.js";
 import { parseKonsep } from "../lib/parseKonsep.js";
 import { jalankanRelasiKonsepDiLatarBelakang } from "../services/relationship.service.js";
 import {
@@ -81,7 +85,10 @@ router.post("/summarize", batasAiHarian, batasAiPerMenit, async (req, res) => {
 
   // 3. Panggil AI service dengan pembatas data aman
   try {
-    const userPrompt = `Judul: ${note.title}\n<catatan>\n${note.content}\n</catatan>`;
+    const teksCatatan = netralkanPenandaCatatan(
+      `Judul: ${note.title}\nIsi:\n${note.content}`
+    );
+    const userPrompt = `<catatan>\n${teksCatatan}\n</catatan>`;
 
     const aiResult = await generateText({
       system: SYSTEM_PROMPT_SUMMARY,
@@ -180,7 +187,10 @@ router.post("/extract-concepts", batasAiHarian, batasAiPerMenit, async (req, res
 
   // 3. Panggil AI service dengan json: true
   try {
-    const userPrompt = `Judul: ${note.title}\n<catatan>\n${note.content}\n</catatan>`;
+    const teksCatatan = netralkanPenandaCatatan(
+      `Judul: ${note.title}\nIsi:\n${note.content}`
+    );
+    const userPrompt = `<catatan>\n${teksCatatan}\n</catatan>`;
 
     const aiResult = await generateText({
       system: SYSTEM_PROMPT_CONCEPTS,
@@ -452,8 +462,9 @@ router.post("/merge-preview", batasAiHarian, batasAiMergePerMenit, async (req, r
     // Format catatan untuk prompt AI dengan penanda pembatas aman
     const daftarTeksSumber = urutanCatatan
       .map((n, idx) => {
-        const kontenBersih = n.content.replace(/<<<CATATAN/g, "").replace(/CATATAN>>>/g, "");
-        return `[Catatan ${idx + 1}] Judul: ${n.title}\n<<<CATATAN\n${kontenBersih}\nCATATAN>>>`;
+        const judulBersih = netralkanPenandaCatatan(n.title);
+        const kontenBersih = netralkanPenandaCatatan(n.content);
+        return `[Catatan ${idx + 1}] <<<CATATAN\nJudul: ${judulBersih}\nIsi:\n${kontenBersih}\nCATATAN>>>`;
       })
       .join("\n\n");
 

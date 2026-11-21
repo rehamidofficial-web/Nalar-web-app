@@ -118,7 +118,7 @@ router.get("/tags", async (req, res) => {
     });
     return;
   } catch (err) {
-    console.error("Error mengambil tags:", err);
+    console.error("Error mengambil tags:", err instanceof Error ? err.name : "UnknownError");
     res.status(500).json({
       success: false,
       message: "Gagal mengambil daftar tag",
@@ -219,7 +219,7 @@ router.get("/", async (req, res) => {
     });
     return;
   } catch (err) {
-    console.error("Error mengambil daftar catatan:", err);
+    console.error("Error mengambil daftar catatan:", err instanceof Error ? err.name : "UnknownError");
     res.status(500).json({
       success: false,
       message: "Gagal mengambil daftar catatan",
@@ -470,7 +470,7 @@ router.post("/merge", async (req, res) => {
     });
     return;
   } catch (err) {
-    console.error("Error menyimpan catatan gabungan:", err);
+    console.error("Error menyimpan catatan gabungan:", err instanceof Error ? err.name : "UnknownError");
     res.status(500).json({
       success: false,
       message: "Gagal menyimpan catatan gabungan",

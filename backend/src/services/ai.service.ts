@@ -9,6 +9,12 @@ export const MAKSIMAL_KARAKTER_EMBEDDING = 4000;
 // Dimensi vektor embedding yang disimpan di PostgreSQL vector(1536)
 export const EMBEDDING_DIMENSI = 1536;
 
+export function netralkanPenandaCatatan(teks: string): string {
+  return teks
+    .replace(/<\/?catatan\s*>/gi, "")
+    .replace(/<<<CATATAN|CATATAN>>>/gi, "");
+}
+
 /**
  * Custom Error untuk AI dengan status HTTP dan pesan ramah pengguna.
  */

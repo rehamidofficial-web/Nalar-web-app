@@ -18,22 +18,35 @@ validateJwtSecretConfiguration();
 
 // Tangani uncaughtException dan unhandledRejection di tingkat proses
 process.on("uncaughtException", (err) => {
-  console.error(`[${new Date().toISOString()}] FATAL uncaughtException: ${err?.name || "Error"} - ${err?.message || ""}`);
+  console.error(`[${new Date().toISOString()}] FATAL uncaughtException: ${err?.name || "Error"}`);
   process.exit(1);
 });
 
 process.on("unhandledRejection", (reason: any) => {
-  console.error(`[${new Date().toISOString()}] WARN unhandledRejection: ${reason?.name || "Reason"} - ${reason?.message || reason}`);
+  const errorName = reason instanceof Error ? reason.name : "UnknownError";
+  console.error(`[${new Date().toISOString()}] WARN unhandledRejection: ${errorName}`);
 });
 
 const app = express();
-app.use(helmet());
+app.disable("x-powered-by");
+const helmetOptions =
+  process.env.NODE_ENV === "production"
+    ? {}
+    : { strictTransportSecurity: false };
+app.use(helmet(helmetOptions));
 
-// CORS: izinkan origin frontend dari FRONTEND_URL atau bawaan http://localhost:3000
-const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:3000";
+// Produksi hanya mengizinkan origin yang dikonfigurasi; development memakai localhost.
+const allowedOrigin =
+  process.env.FRONTEND_URL ||
+  (process.env.NODE_ENV === "production" ? false : "http://localhost:3000");
 app.use(
   cors({
-    origin: allowedOrigin,
+    origin: (requestOrigin, callback) => {
+      callback(
+        null,
+        typeof allowedOrigin === "string" && requestOrigin === allowedOrigin
+      );
+    },
     exposedHeaders: ["Retry-After", "RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset"],
   })
 );

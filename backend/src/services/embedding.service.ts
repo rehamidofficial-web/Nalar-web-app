@@ -1,4 +1,4 @@
-import { AiError, createEmbedding } from "./ai.service.js";
+import { createEmbedding } from "./ai.service.js";
 import { prisma } from "../lib/prisma.js";
 import { keTeksVektor } from "../lib/vektor.js";
 import { jalankanRelasiDiLatarBelakang } from "./relationship.service.js";
@@ -53,10 +53,9 @@ export async function jalankanEmbeddingDiLatarBelakang(
       void jalankanRelasiDiLatarBelakang(userId, note.id);
     }
   } catch (error) {
-    const message =
-      error instanceof AiError
-        ? error.userMessage
-        : "Terjadi kesalahan saat menyimpan embedding.";
-    console.error(`[Embedding] Catatan ${note.id} gagal di-embed: ${message}`);
+    const errorName = error instanceof Error ? error.name : "UnknownError";
+    console.error(
+      `[Embedding] Catatan ${note.id} gagal di-embed: ${errorName}`
+    );
   }
 }
