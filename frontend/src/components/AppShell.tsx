@@ -122,7 +122,7 @@ export function AppShell({ user, children }: AppShellProps) {
             Catatan Baru
           </Link>
 
-          <nav className="mt-6 space-y-1" aria-label="Navigasi utama">
+          <nav className="mt-6 space-y-1" aria-label="Navigasi samping utama">
             {MENU.map((item) => {
               const active = item.match(pathname);
               return (
@@ -253,7 +253,7 @@ export function AppShell({ user, children }: AppShellProps) {
 
       {/* Navigasi bawah (layar kecil) */}
       <nav
-        aria-label="Navigasi utama"
+        aria-label="Navigasi bawah"
         className="fixed inset-x-0 bottom-0 z-40 flex h-[4.25rem] items-stretch border-t border-slate-200 bg-white lg:hidden"
       >
         {MENU.filter((m) => m.inBottomBar).map((item) => {

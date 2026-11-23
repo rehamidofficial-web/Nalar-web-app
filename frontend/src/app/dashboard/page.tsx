@@ -231,7 +231,11 @@ export default function DashboardPage() {
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           {/* Catatan terbaru */}
-          <section className={`${cardClass} overflow-hidden`} aria-labelledby="judul-terbaru">
+          <section
+            className={`${cardClass} overflow-hidden`}
+            aria-labelledby="judul-terbaru"
+            aria-busy={isLoading}
+          >
             <div className="flex items-center justify-between px-5 py-4 sm:px-6">
               <h2 id="judul-terbaru" className="text-lg font-bold text-slate-900">
                 Catatan Terbaru
