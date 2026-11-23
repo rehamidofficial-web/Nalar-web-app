@@ -78,7 +78,6 @@ export function AppShell({ user, children }: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const isGraphPage = pathname === "/graph";
   const hideFab =
     pathname === "/notes/new" ||
     pathname === "/assistant" ||
@@ -236,22 +235,8 @@ export function AppShell({ user, children }: AppShellProps) {
           {renderSidebar()}
         </aside>
 
-        <main
-          className={`min-w-0 flex-1 lg:pl-[272px] ${
-            isGraphPage
-              ? "h-[calc(100dvh-4rem-4.25rem)] min-h-0 overflow-hidden lg:h-screen"
-              : "pb-24 lg:pb-0"
-          }`}
-        >
-          <div
-            className={
-              isGraphPage
-                ? "h-full min-h-0 overflow-hidden"
-                : "mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-9"
-            }
-          >
-            {children}
-          </div>
+        <main className="min-w-0 flex-1 pb-24 lg:pb-0 lg:pl-[272px]">
+          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-9">{children}</div>
         </main>
       </div>
 

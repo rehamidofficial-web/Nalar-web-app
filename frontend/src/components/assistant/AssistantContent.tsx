@@ -38,7 +38,7 @@ export function AssistantContent() {
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
-  const [inputQuestion, setInputQuestion] = useState("");
+  const [inputQuestion, setInputQuestion] = useState(searchParams.get("tanya") ?? "");
 
   const [isLoadingList, setIsLoadingList] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);

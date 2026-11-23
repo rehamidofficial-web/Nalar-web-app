@@ -37,6 +37,7 @@ type IconName =
   | "search"
   | "settings"
   | "plus"
+  | "minus"
   | "arrow-right"
   | "arrow-left"
   | "grid"
@@ -97,6 +98,7 @@ const PATHS: Record<IconName, ReactNode> = {
     </>
   ),
   plus: <path d="M12 5v14M5 12h14" />,
+  minus: <path d="M5 12h14" />,
   "arrow-right": <path d="M5 12h14M13 6l6 6-6 6" />,
   "arrow-left": <path d="M19 12H5M11 6l-6 6 6 6" />,
   grid: (
