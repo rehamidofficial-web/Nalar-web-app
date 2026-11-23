@@ -5,7 +5,6 @@ import { vi, beforeEach, afterEach } from "vitest";
 beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
-  vi.restoreAllMocks();
 });
 
 afterEach(() => {
