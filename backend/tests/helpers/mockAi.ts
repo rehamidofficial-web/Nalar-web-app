@@ -24,7 +24,9 @@ const mocks = vi.hoisted(() => {
     terpotong: false,
   });
 
-  const buatTeks = async (opsi: { json?: boolean; system?: string }) => ({
+  const buatTeks = async (
+    opsi: { json?: boolean; system?: string; user: string }
+  ) => ({
     text: opsi.json
       ? opsi.system?.includes("Gabungkan catatan")
         ? JSON.stringify({ title: "Catatan Gabungan", content: "Isi gabungan." })
