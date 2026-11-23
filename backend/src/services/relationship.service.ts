@@ -73,7 +73,7 @@ export async function hitungRelasiSimilar(
 
   const relasiList = Array.from(relasiDataMap.values());
 
-  // 3. Transaksi: Hapus relasi 'similar' lama yang melibatkan catatan ini, lalu buat yang baru
+  // 3. Transaksi: jaga batas relasi pada kedua ujung setiap pasangan
   const result = await prisma.$transaction(async (tx) => {
     await tx.noteRelationship.deleteMany({
       where: {
@@ -82,8 +82,50 @@ export async function hitungRelasiSimilar(
       },
     });
 
+    const neighborIds = Array.from(
+      new Set(relasiList.map((r) => (r.source === noteId ? r.target : r.source)))
+    );
+    const neighborRelations = await tx.noteRelationship.findMany({
+      where: {
+        relationshipType: "similar",
+        OR: [
+          { sourceNoteId: { in: neighborIds } },
+          { targetNoteId: { in: neighborIds } },
+        ],
+      },
+      select: { sourceNoteId: true, targetNoteId: true },
+    });
+    const degree = new Map(neighborIds.map((id) => [id, 0]));
+    for (const relation of neighborRelations) {
+      degree.set(
+        relation.sourceNoteId,
+        (degree.get(relation.sourceNoteId) ?? 0) + 1
+      );
+      degree.set(
+        relation.targetNoteId,
+        (degree.get(relation.targetNoteId) ?? 0) + 1
+      );
+    }
+
+    let noteDegree = 0;
+    const relasiTerpilih = relasiList.filter((relation) => {
+      const neighborId =
+        relation.source === noteId ? relation.target : relation.source;
+      const neighborDegree = degree.get(neighborId) ?? 0;
+      if (
+        noteDegree >= RELASI_MAKS_PER_CATATAN ||
+        neighborDegree >= RELASI_MAKS_PER_CATATAN
+      ) {
+        return false;
+      }
+
+      noteDegree += 1;
+      degree.set(neighborId, neighborDegree + 1);
+      return true;
+    });
+
     const created = await tx.noteRelationship.createMany({
-      data: relasiList.map((r) => ({
+      data: relasiTerpilih.map((r) => ({
         sourceNoteId: r.source,
         targetNoteId: r.target,
         relationshipType: "similar",
