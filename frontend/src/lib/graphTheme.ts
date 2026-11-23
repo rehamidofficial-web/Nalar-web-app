@@ -1,87 +1,214 @@
-/**
- * Tema visual untuk Knowledge Graph
- * Edisi Khusus: "Papan Detektif Benang Merah" (Detective Board with Red Strings & Paper Clips)
- * Terinspirasi oleh identitas logo Nalar: Kertas Ide, Pin Merah, dan Benang Pengetahuan.
- */
+export type GraphThemeName = "modern" | "detective";
 
-export const GRAPH_THEME = {
-  // Latar belakang kanvas: Papan gabus hangat / papan investigasi
+export interface GraphThemeConfig {
   board: {
-    background: "#241e17", // Papan kayu / gabus gelap elegan (kontras tinggi untuk kartu kertas)
-    patternColor: "#1d1812", // Nuansa tekstur papan
-    gridColor: "rgba(255, 255, 255, 0.03)",
-  },
-
-  // Kartu Kertas (Node)
-  card: {
-    // Dimensi kartu dasar
-    minWidth: 54,
-    maxWidth: 96,
-    baseWidth: 64,
-    heightRatio: 0.62, // Aspek rasio kartu kertas catatan (lebar x tinggi)
-    radius: 4, // Sudut melengkung halus kartu kertas
-
-    // Warna kertas
-    defaultBg: "#fbfaf5", // Kertas krem/off-white alami
-    centerBg: "#fffdf0", // Kertas fokus catatan pusat
-    selectedBg: "#ffffff", // Kertas saat dipilih
-    dimmedBg: "#4a443b", // Kertas meredup saat node lain disorot
-    isolatedBg: "#e7e5dc", // Kertas tanpa hubungan
-
-    // Border & Bayangan kartu
-    borderColor: "#e2ded4",
-    borderHighlight: "#e11d48", // Border merah saat dipilih
-    shadowColor: "rgba(0, 0, 0, 0.45)",
-    shadowBlur: 6,
-
-    // Teks di atas kartu kertas
-    textColor: "#1c1917", // Tinta hitam arang tajam (stone-900)
-    textDimmedColor: "#a8a29e",
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-
-    // Penjepit kertas & Pin (Paperclip & Pushpin)
-    pinColor: "#e11d48", // Merah khas Nalar (rose-600)
-    pinCenterColor: "#ea580c", // Pin oranye untuk catatan pusat
-    pinHighlight: "#f43f5e",
-    pinRadius: 3.5,
-    paperclipColor: "#94a3b8", // Logam silver/slate untuk klip kertas
-    paperclipHighlight: "#e11d48",
-  },
-
-  // Benang Hubungan (Edge)
-  thread: {
-    // Benang Merah (Relasi Makna Mirip / Similar)
-    similarColor: "#e11d48", // Benang merah khas detektif (rose-600)
-    similarHighlight: "#ff2056", // Benang merah menyala terang saat disorot
-    similarDimmed: "rgba(120, 50, 60, 0.2)", // Meredup gelap di latar papan
-    similarMinWidth: 1.4,
-    similarMaxWidth: 3.8,
-    curvature: 0.12, // Lengkungan alami benang menggantung di papan
-
-    // Benang Sekunder (Relasi Konsep Sama / Concept)
-    conceptColor: "#38bdf8", // Benang biru muda/kapur putus-putus
-    conceptHighlight: "#7dd3fc",
-    conceptDimmed: "rgba(56, 189, 248, 0.15)",
-    conceptWidth: 1.2,
-    dashPattern: [4, 4],
-    conceptCurvature: -0.08, // Melengkung ke arah berlawanan agar tidak tumpuk
-  },
-
-  // Fisika Tata Letak (D3 Force Simulation)
-  physics: {
-    chargeStrength: -320, // Gaya tolak antar kartu agar tidak bertumpuk
-    linkDistance: 80, // Jarak antar kartu yang terhubung
-    collideRadiusPadding: 16, // Bantalan ruang gerak kartu
-    velocityDecay: 0.35, // Gesekan agar pergerakan kartu tenang dan mulus
-  },
-
-  // Optimasi Performa
-  performance: {
-    heavyThreshold: 120, // Jika node > 120, matikan bayangan dan penyederhanaan gambar
-  },
-  // Kompatibilitas alias untuk komponen lain (seperti NodeDetailPanel)
+    background: string;
+    patternColor: string;
+    gridColor: string;
+  };
   node: {
-    defaultColor: "#e11d48",
-    centerHighlight: "#ea580c",
+    minRadius: number;
+    maxRadius: number;
+    baseRadius: number;
+    radiusPerRelation: number;
+    neutralFill: string;
+    neutralBorder: string;
+    centerFill: string;
+    activeBorder: string;
+    dimmedOpacity: number;
+    tagColors: string[];
+    labelBackground: string;
+    labelBorder: string;
+    labelText: string;
+    labelFontFamily: string;
+    labelFontSize: number;
+    labelMaxWidth: number;
+    labelGap: number;
+    defaultColor: string;
+    centerHighlight: string;
+  };
+  thread: {
+    similarColor: string;
+    similarHighlight: string;
+    similarDimmed: string;
+    similarMinWidth: number;
+    similarMaxWidth: number;
+    curvature: number;
+    conceptColor: string;
+    conceptHighlight: string;
+    conceptDimmed: string;
+    conceptWidth: number;
+    dashPattern: number[];
+    conceptCurvature: number;
+  };
+  ui: {
+    panel: string;
+    panelAlt: string;
+    border: string;
+    text: string;
+    muted: string;
+    control: string;
+    controlHover: string;
+    accent: string;
+    accentText: string;
+    selected: string;
+  };
+  physics: {
+    chargeStrength: number;
+    linkDistance: number;
+    velocityDecay: number;
+    centerStrength: number;
+    isolatedRadius: number;
+    isolatedSpacing: number;
+  };
+  performance: {
+    heavyThreshold: number;
+    glowBlur: number;
+    zoomToShowLabels: number;
+    labelGridCell: number;
+    fitPadding: number;
+  };
+}
+
+export const GRAPH_THEMES: Record<GraphThemeName, GraphThemeConfig> = {
+  modern: {
+    board: {
+      background: "#0b1020",
+      patternColor: "#0f1530",
+      gridColor: "rgba(129, 140, 248, 0.07)",
+    },
+    node: {
+      minRadius: 13,
+      maxRadius: 27,
+      baseRadius: 15,
+      radiusPerRelation: 2.1,
+      neutralFill: "#1c2347",
+      neutralBorder: "#6a73e0",
+      centerFill: "#818cf8",
+      activeBorder: "#e0e7ff",
+      dimmedOpacity: 0.2,
+      tagColors: ["#818cf8", "#a78bfa", "#93c5fd", "#c4b5fd", "#a5b4fc", "#7dd3fc"],
+      labelBackground: "rgba(19, 26, 46, 0.96)",
+      labelBorder: "#363f78",
+      labelText: "#e6eaf5",
+      labelFontFamily: '"Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif',
+      labelFontSize: 13,
+      labelMaxWidth: 190,
+      labelGap: 8,
+      defaultColor: "#6a73e0",
+      centerHighlight: "#a5b4fc",
+    },
+    thread: {
+      similarColor: "#818cf8",
+      similarHighlight: "#c7d2fe",
+      similarDimmed: "rgba(129, 140, 248, 0.12)",
+      similarMinWidth: 0.8,
+      similarMaxWidth: 2.4,
+      curvature: 0.1,
+      conceptColor: "#a78bfa",
+      conceptHighlight: "#ddd6fe",
+      conceptDimmed: "rgba(167, 139, 250, 0.1)",
+      conceptWidth: 0.9,
+      dashPattern: [4, 5],
+      conceptCurvature: -0.07,
+    },
+    ui: {
+      panel: "#131a2e",
+      panelAlt: "#0f1528",
+      border: "#26304a",
+      text: "#e6eaf5",
+      muted: "#9aa6c0",
+      control: "#1a2238",
+      controlHover: "#26304a",
+      accent: "#5458ee",
+      accentText: "#eef0ff",
+      selected: "#1c2046",
+    },
+    physics: {
+      chargeStrength: -560,
+      linkDistance: 142,
+      velocityDecay: 0.42,
+      centerStrength: 0.035,
+      isolatedRadius: 210,
+      isolatedSpacing: 12,
+    },
+    performance: {
+      heavyThreshold: 150,
+      glowBlur: 9,
+      zoomToShowLabels: 1.25,
+      labelGridCell: 160,
+      fitPadding: 56,
+    },
+  },
+  detective: {
+    board: {
+      background: "#241e17",
+      patternColor: "#1d1812",
+      gridColor: "rgba(255, 255, 255, 0.045)",
+    },
+    node: {
+      minRadius: 13,
+      maxRadius: 27,
+      baseRadius: 15,
+      radiusPerRelation: 2.1,
+      neutralFill: "#fbfaf5",
+      neutralBorder: "#e2ded4",
+      centerFill: "#ea580c",
+      activeBorder: "#fff7ed",
+      dimmedOpacity: 0.2,
+      tagColors: ["#c4b5fd", "#a7f3d0", "#fde68a", "#fda4af", "#93c5fd", "#fbcfe8"],
+      labelBackground: "rgba(36, 30, 23, 0.97)",
+      labelBorder: "#75614b",
+      labelText: "#fffaf2",
+      labelFontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      labelFontSize: 13,
+      labelMaxWidth: 190,
+      labelGap: 8,
+      defaultColor: "#e11d48",
+      centerHighlight: "#ea580c",
+    },
+    thread: {
+      similarColor: "#e11d48",
+      similarHighlight: "#ff2056",
+      similarDimmed: "rgba(225, 29, 72, 0.14)",
+      similarMinWidth: 0.8,
+      similarMaxWidth: 2.4,
+      curvature: 0.12,
+      conceptColor: "#38bdf8",
+      conceptHighlight: "#bae6fd",
+      conceptDimmed: "rgba(56, 189, 248, 0.12)",
+      conceptWidth: 0.9,
+      dashPattern: [4, 5],
+      conceptCurvature: -0.08,
+    },
+    ui: {
+      panel: "#2b2118",
+      panelAlt: "#35291e",
+      border: "#594533",
+      text: "#fff7ed",
+      muted: "#d6c6b0",
+      control: "#3a2f23",
+      controlHover: "#4a3b2c",
+      accent: "#e11d48",
+      accentText: "#fff1f2",
+      selected: "#4a2430",
+    },
+    physics: {
+      chargeStrength: -560,
+      linkDistance: 142,
+      velocityDecay: 0.42,
+      centerStrength: 0.035,
+      isolatedRadius: 210,
+      isolatedSpacing: 12,
+    },
+    performance: {
+      heavyThreshold: 150,
+      glowBlur: 9,
+      zoomToShowLabels: 1.25,
+      labelGridCell: 160,
+      fitPadding: 56,
+    },
   },
 };
+
+export const GRAPH_THEME = GRAPH_THEMES.detective;

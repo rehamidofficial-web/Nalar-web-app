@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch, pesanError } from "@/lib/api";
+import { NalarMark, Spinner } from "@/components/ui";
 import { saveToken } from "@/lib/auth";
 
 export default function LoginPage() {
@@ -32,49 +33,50 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 text-slate-900">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
+      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-[0_8px_30px_rgba(15,23,42,0.06)] ring-1 ring-slate-200 sm:p-10">
         <div className="mb-6 flex flex-col items-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-lengkap.png" alt="Nalar" className="h-16 w-16" />
-          <h1 className="mt-3 text-2xl font-bold">Masuk ke Nalar</h1>
-          <p className="text-sm text-slate-500">
+          <NalarMark size={56} />
+          <h1 className="mt-4 text-[26px] font-bold tracking-tight text-slate-900">Masuk ke Nalar</h1>
+          <p className="mt-1 text-sm text-slate-500">
             Hubungkan Idemu. Temukan Pengetahuanmu.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="mb-1 block text-sm font-medium">
+            <label htmlFor="email" className="mb-1.5 block text-sm font-semibold text-slate-900">
               Email
             </label>
             <input
               id="email"
               type="email"
+              autoComplete="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+              className="w-full min-h-[48px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-slate-900 placeholder-slate-400 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
             />
           </div>
           <div>
             <label
               htmlFor="password"
-              className="mb-1 block text-sm font-medium"
+              className="mb-1.5 block text-sm font-semibold text-slate-900"
             >
               Password
             </label>
             <input
               id="password"
               type="password"
+              autoComplete="current-password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+              className="w-full min-h-[48px] rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-slate-900 placeholder-slate-400 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
             />
           </div>
 
           {error && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
               {error}
             </p>
           )}
@@ -82,9 +84,9 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-indigo-600 py-2.5 font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+            className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-60"
           >
-            {loading ? "Memproses..." : "Masuk"}
+            {loading ? (<><Spinner /> Memproses…</>) : "Masuk"}
           </button>
         </form>
 
@@ -92,7 +94,7 @@ export default function LoginPage() {
           Belum punya akun?{" "}
           <Link
             href="/register"
-            className="font-medium text-indigo-600 hover:underline"
+            className="font-semibold text-indigo-700 hover:underline"
           >
             Daftar
           </Link>

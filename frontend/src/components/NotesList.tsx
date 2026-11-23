@@ -8,6 +8,7 @@ import { useRequireAuth } from "@/lib/useRequireAuth";
 import { AppShell } from "@/components/AppShell";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Pagination } from "@/components/Pagination";
+import { Icon, PageHeader, cardClass, btnPrimary, btnSecondary, inputClass } from "@/components/ui";
 import { apiFetch, pesanError } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 
@@ -71,6 +72,7 @@ export function NotesList() {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
 
+  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ left: number; top: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -410,146 +412,275 @@ export function NotesList() {
     );
   }
 
+  const chipBase =
+    "inline-flex min-h-[40px] items-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition-colors";
+  const chipOn = "border-indigo-600 bg-indigo-600 text-white";
+  const chipOff = "border-slate-200 bg-white text-slate-700 hover:bg-slate-50";
+
+  const awalTampil = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1;
+  const akhirTampil = Math.min(pagination.page * pagination.limit, pagination.total);
+
+  function renderCard(note: NoteItem) {
+    const isSelected = selectedNoteIds.includes(note.id);
+    const reachedLimit = selectedNoteIds.length >= 5 && !isSelected;
+    const tagUtama = note.tags?.[0];
+
+    return (
+      <div
+        key={note.id}
+        className={`relative flex flex-col rounded-2xl bg-white p-5 ring-1 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:shadow-md ${
+          isSelected ? "ring-2 ring-indigo-600" : "ring-slate-200"
+        } ${viewMode === "list" ? "sm:flex-row sm:items-center sm:gap-5" : "min-h-[200px]"}`}
+      >
+        {isSelectionMode ? (
+          <button
+            type="button"
+            disabled={reachedLimit}
+            aria-label={`${isSelected ? "Batalkan pilihan" : "Pilih"} catatan ${note.title}`}
+            aria-pressed={isSelected}
+            onClick={() => toggleSelectNote(note.id)}
+            className="absolute inset-0 z-0 rounded-2xl disabled:cursor-not-allowed"
+          />
+        ) : (
+          <Link
+            href={`/notes/${note.id}`}
+            aria-label={`Buka catatan ${note.title}`}
+            className="absolute inset-0 z-0 rounded-2xl"
+          />
+        )}
+
+        <div className="pointer-events-none relative z-10 flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center justify-between gap-3">
+            {tagUtama ? (
+              <button
+                type="button"
+                onClick={() => updateQueryParams({ tag: tagUtama, page: 1 })}
+                className="pointer-events-auto rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+              >
+                {tagUtama}
+              </button>
+            ) : (
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                Tanpa tag
+              </span>
+            )}
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-slate-500">Diubah {formatDate(note.updatedAt)}</span>
+              {isSelectionMode && (
+                <label className="pointer-events-auto inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg hover:bg-indigo-50">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    disabled={reachedLimit}
+                    onChange={() => toggleSelectNote(note.id)}
+                    aria-label={`${isSelected ? "Batalkan pilihan" : "Pilih"} catatan ${note.title}`}
+                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 disabled:opacity-40"
+                  />
+                </label>
+              )}
+              <button
+                type="button"
+                aria-label={`Menu tindakan untuk ${note.title}`}
+                aria-haspopup="menu"
+                aria-expanded={openMenuId === note.id}
+                aria-controls={openMenuId === note.id ? `note-menu-${note.id}` : undefined}
+                onClick={(event) => toggleNoteMenu(note.id, event.currentTarget)}
+                className="pointer-events-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+              >
+                <Icon name="more" className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+
+          <h2 className="mt-3 line-clamp-2 text-lg font-bold leading-snug text-slate-900">
+            {note.title}
+          </h2>
+          <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-500">
+            {note.summary || note.contentPreview || "Tidak ada isi teks."}
+          </p>
+
+          {note.tags && note.tags.length > 1 && (
+            <div className="mt-auto flex flex-wrap gap-1.5 pt-4">
+              {note.tags.slice(1).map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => updateQueryParams({ tag, page: 1 })}
+                  className="pointer-events-auto rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
+                >
+                  #{tag}
+                </button>
+              ))}
+            </div>
+          )}
+          {isSelectionMode && reachedLimit && (
+            <p className="mt-2 text-xs text-slate-500">Maksimal 5 pilihan</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <AppShell user={user}>
       <div>
-        {/* Header Bagian Atas */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-slate-200">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              Catatan Saya
-            </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              Kelola semua ide dan catatan pengetahuan pribadimu.
-            </p>
-          </div>
-          <div>
-            <Link
-              href="/notes/new"
-              className="inline-flex min-h-[44px] w-full sm:w-auto items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
-            >
-              + Catatan Baru
+        <PageHeader
+          title="Catatan Saya"
+          subtitle="Semua yang sudah kamu simpan, di satu tempat."
+          action={
+            <Link href="/notes/new" className={`${btnPrimary} hidden sm:inline-flex`}>
+              <Icon name="plus" className="h-5 w-5" />
+              Catatan Baru
             </Link>
+          }
+        />
+
+        {/* Pencarian, urutan, dan tampilan */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative flex-1">
+            <Icon
+              name="search"
+              className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Cari di catatanmu"
+              aria-label="Cari judul atau isi catatan"
+              className={`${inputClass} pl-11`}
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div
+              role="group"
+              aria-label="Urutkan catatan"
+              className="inline-flex rounded-xl border border-slate-200 bg-white p-1"
+            >
+              {(
+                [
+                  ["terbaru", "Terbaru"],
+                  ["terlama", "Terlama"],
+                  ["judul", "Judul A–Z"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={paramSort === value}
+                  onClick={() => updateQueryParams({ sort: value, page: 1 })}
+                  className={`min-h-[36px] rounded-lg px-3.5 text-sm font-semibold transition-colors ${
+                    paramSort === value
+                      ? "bg-indigo-50 text-indigo-700"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div
+              role="group"
+              aria-label="Tampilan daftar"
+              className="inline-flex rounded-xl border border-slate-200 bg-white p-1"
+            >
+              {(
+                [
+                  ["cards", "Kartu", "grid"],
+                  ["list", "Daftar", "list"],
+                ] as const
+              ).map(([value, label, icon]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={viewMode === value}
+                  onClick={() => setViewMode(value)}
+                  className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-3.5 text-sm font-semibold transition-colors ${
+                    viewMode === value
+                      ? "bg-indigo-50 text-indigo-700"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <Icon name={icon} className="h-4 w-4" />
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Kontrol Pencarian, Urutan & Filter Tag */}
-        <div className="mt-6 space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            {/* Input Cari */}
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Cari judul atau isi catatan..."
-                className="w-full min-h-[44px] rounded-lg border border-slate-300 bg-white pl-10 pr-4 py-2 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-              />
-              <svg
-                className="absolute left-3.5 top-3 h-5 w-5 text-slate-400"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-                />
-              </svg>
-            </div>
-
-            {/* Select Urutan */}
-            <div className="flex items-center gap-2 sm:w-auto">
-              <label htmlFor="sort" className="text-xs font-medium text-slate-500 whitespace-nowrap">
-                Urutkan:
-              </label>
-              <select
-                id="sort"
-                value={paramSort}
-                onChange={(e) => updateQueryParams({ sort: e.target.value, page: 1 })}
-                className="min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
-              >
-                <option value="terbaru">Terbaru</option>
-                <option value="terlama">Terlama</option>
-                <option value="judul">Judul (A-Z)</option>
-              </select>
-            </div>
+        {/* Chip tag */}
+        {availableTags.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-2" aria-label="Filter tag">
+            <button
+              type="button"
+              aria-pressed={!paramTag}
+              onClick={() => updateQueryParams({ tag: "", page: 1 })}
+              className={`${chipBase} ${!paramTag ? chipOn : chipOff}`}
+            >
+              Semua
+            </button>
+            {availableTags.map((t) => {
+              const isActive = paramTag === t.tag;
+              return (
+                <button
+                  key={t.tag}
+                  type="button"
+                  aria-pressed={isActive}
+                  onClick={() => updateQueryParams({ tag: isActive ? "" : t.tag, page: 1 })}
+                  className={`${chipBase} ${isActive ? chipOn : chipOff}`}
+                >
+                  {t.tag}
+                  <span className={`text-xs ${isActive ? "text-indigo-100" : "text-slate-400"}`}>
+                    {t.count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
+        )}
 
-          {/* Deretan Chip Filter Tag */}
-          {availableTags.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-              <button
-                type="button"
-                onClick={() => updateQueryParams({ tag: "", page: 1 })}
-                className={`inline-flex min-h-[32px] items-center rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                  !paramTag
-                    ? "bg-indigo-600 text-white font-semibold"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
-              >
-                Semua
-              </button>
+        {!isInitialLoading && !errorMessage && pagination.total > 0 && (
+          <p className="mt-5 text-sm text-slate-500" aria-live="polite">
+            Menampilkan {awalTampil}–{akhirTampil} dari {pagination.total} catatan
+          </p>
+        )}
 
-              {availableTags.map((t) => {
-                const isActive = paramTag === t.tag;
-                return (
-                  <button
-                    key={t.tag}
-                    type="button"
-                    onClick={() => updateQueryParams({ tag: isActive ? "" : t.tag, page: 1 })}
-                    className={`inline-flex min-h-[32px] items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                      isActive
-                        ? "bg-indigo-600 text-white font-semibold"
-                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                    }`}
-                  >
-                    <span>#{t.tag}</span>
-                    <span
-                      className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                        isActive ? "bg-indigo-800 text-white" : "bg-slate-200 text-slate-600"
-                      }`}
-                    >
-                      {t.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Kotak Error */}
         {errorMessage && (
-          <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg bg-red-50 p-4 text-sm text-red-700">
-            <span>{errorMessage}</span>
+          <div
+            role="alert"
+            className="mt-6 flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div>
+              <p className="text-sm font-semibold text-red-700">Catatanmu belum bisa dimuat</p>
+              <p className="mt-0.5 text-sm text-red-700/90">{errorMessage} Tidak ada yang hilang.</p>
+            </div>
             <button
               type="button"
               onClick={fetchNotes}
-              className="inline-flex items-center justify-center rounded-md bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-800 hover:bg-red-200"
+              className="inline-flex min-h-[40px] items-center justify-center self-start rounded-xl border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 hover:bg-red-50"
             >
               Coba lagi
             </button>
           </div>
         )}
 
-        {/* Bilah Aksi Gabungkan Catatan dengan AI */}
+        {/* Bilah gabung catatan */}
         {isSelectionMode && (
-          <div className="sticky top-20 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
+          <div className="sticky top-20 z-20 mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
             <div className="flex items-center gap-2 text-sm font-semibold text-indigo-900">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs text-white">
                 {selectedNoteIds.length}
               </span>
-              <span>{selectedNoteIds.length} dipilih</span>
+              <span>dipilih</span>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={leaveSelectionMode}
-                className="inline-flex min-h-[36px] items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                className="inline-flex min-h-[40px] items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 Batal
               </button>
@@ -561,197 +692,72 @@ export function NotesList() {
                   leaveSelectionMode();
                   router.push(mergeUrl);
                 }}
-                className="inline-flex min-h-[36px] items-center justify-center rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-400"
-                title={selectedNoteIds.length < 2 ? "Pilih minimal 2 catatan untuk digabung" : "Gabungkan catatan yang dipilih"}
+                className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                title={
+                  selectedNoteIds.length < 2
+                    ? "Pilih minimal 2 catatan untuk digabung"
+                    : "Gabungkan catatan yang dipilih"
+                }
               >
+                <Icon name="merge" className="h-4 w-4" />
                 Gabungkan dengan AI
               </button>
             </div>
           </div>
         )}
 
-        {/* Konten Daftar Catatan */}
+        {/* Isi daftar */}
         {isInitialLoading ? (
-          /* Kartu Kerangka Skeleton Berdenyut */
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {[1, 2, 3, 4].map((n) => (
-              <div
-                key={n}
-                className="animate-pulse rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 space-y-3"
-              >
+          <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((n) => (
+              <div key={n} className={`${cardClass} min-h-[200px] animate-pulse space-y-3 p-5`}>
+                <div className="h-5 w-20 rounded-full bg-slate-100" />
                 <div className="h-5 w-3/4 rounded bg-slate-200" />
-                <div className="space-y-2">
-                  <div className="h-3.5 w-full rounded bg-slate-100" />
-                  <div className="h-3.5 w-5/6 rounded bg-slate-100" />
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <div className="h-4 w-12 rounded-full bg-slate-100" />
-                  <div className="h-4 w-16 rounded-full bg-slate-100" />
-                </div>
+                <div className="h-3.5 w-full rounded bg-slate-100" />
+                <div className="h-3.5 w-5/6 rounded bg-slate-100" />
               </div>
             ))}
           </div>
         ) : notes.length === 0 && !errorMessage ? (
           hasFilterActive ? (
-            /* Keadaan Kosong karena Filter */
-            <div className="mt-8 rounded-2xl bg-white p-8 text-center ring-1 ring-slate-200 sm:p-12">
-              <h3 className="text-base font-semibold text-slate-900">
-                Tidak ada catatan yang cocok
-              </h3>
-              <p className="mt-1 text-sm text-slate-500 max-w-sm mx-auto">
-                Tidak ada catatan yang cocok dengan filter atau kata kunci pencarian ini.
+            <div className={`${cardClass} mt-8 p-10 text-center`}>
+              <h3 className="text-base font-semibold text-slate-900">Tidak ada catatan yang cocok</h3>
+              <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
+                Coba kata kunci lain atau hapus filter yang aktif.
               </p>
-              <div className="mt-6">
-                <button
-                  type="button"
-                  onClick={resetFilter}
-                  className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors"
-                >
-                  Hapus filter
-                </button>
-              </div>
+              <button type="button" onClick={resetFilter} className={`${btnSecondary} mt-5`}>
+                Hapus filter
+              </button>
             </div>
           ) : (
-            /* Keadaan Kosong Belum Memiliki Catatan */
-            <div className="mt-8 rounded-2xl bg-white p-8 text-center ring-1 ring-slate-200 sm:p-12">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                  className="h-6 w-6"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
-                  />
-                </svg>
-              </div>
-              <h3 className="mt-4 text-base font-semibold text-slate-900">
-                Belum ada catatan
-              </h3>
-              <p className="mt-1 text-sm text-slate-500 max-w-sm mx-auto">
-                Mulai tulis catatan pertamamu untuk menghubungkan ide dan pengetahuan.
+            <div className={`${cardClass} mt-8 p-10 text-center`}>
+              <svg viewBox="0 0 80 48" className="mx-auto h-12 w-20" fill="none" aria-hidden="true">
+                <path d="M8 38 28 14l18 14 26-20" stroke="#4F46E5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="8" cy="38" r="4.5" fill="#fff" stroke="#4F46E5" strokeWidth="2" />
+                <circle cx="28" cy="14" r="4.5" fill="#fff" stroke="#4F46E5" strokeWidth="2" />
+                <circle cx="46" cy="28" r="4.5" fill="#fff" stroke="#4F46E5" strokeWidth="2" />
+                <circle cx="72" cy="8" r="5" fill="#4F46E5" />
+              </svg>
+              <h3 className="mt-4 text-lg font-bold text-slate-900">Belum ada catatan</h3>
+              <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
+                Tulis catatan pertamamu. Nalar akan membantu merangkumnya dan menghubungkannya
+                dengan ide-idemu yang lain.
               </p>
-              <div className="mt-6">
-                <Link
-                  href="/notes/new"
-                  className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
-                >
-                  Tulis Catatan Pertama
-                </Link>
-              </div>
+              <Link href="/notes/new" className={`${btnPrimary} mt-6`}>
+                Tulis catatan pertama
+              </Link>
             </div>
           )
         ) : (
-          /* Grid Kartu Catatan (pudar jika sedang mengambil data baru) */
           <div
-            className={`mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 transition-opacity duration-200 ${
-              isFetching ? "opacity-60" : "opacity-100"
-            }`}
+            className={`mt-5 grid gap-5 transition-opacity duration-200 ${
+              viewMode === "cards" ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3" : "grid-cols-1"
+            } ${isFetching ? "opacity-60" : "opacity-100"}`}
           >
-            {notes.map((note) => {
-              const isSelected = selectedNoteIds.includes(note.id);
-              const reachedLimit = selectedNoteIds.length >= 5 && !isSelected;
-
-              return (
-                <div
-                  key={note.id}
-                  className={`relative flex flex-col justify-between rounded-2xl bg-white p-5 shadow-sm ring-1 transition hover:shadow-md ${
-                    isSelected
-                      ? "ring-2 ring-indigo-600 bg-indigo-50/20"
-                      : "ring-slate-200"
-                  }`}
-                >
-                  {isSelectionMode ? (
-                    <button
-                      type="button"
-                      disabled={reachedLimit}
-                      aria-label={`${isSelected ? "Batalkan pilihan" : "Pilih"} catatan ${note.title}`}
-                      aria-pressed={isSelected}
-                      onClick={() => toggleSelectNote(note.id)}
-                      className="absolute inset-0 z-0 rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed"
-                    />
-                  ) : (
-                    <Link
-                      href={`/notes/${note.id}`}
-                      aria-label={`Buka catatan ${note.title}`}
-                      className="absolute inset-0 z-0 rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600"
-                    />
-                  )}
-
-                  <div className="relative z-10 flex h-full flex-col justify-between pointer-events-none">
-                    <div>
-                      <div className="mb-2 flex items-start justify-between gap-3">
-                        <h2 className="line-clamp-1 flex-1 text-lg font-bold text-slate-900">
-                          {note.title}
-                        </h2>
-                        <div className="flex items-center gap-2">
-                          {isSelectionMode && (
-                            <label className="pointer-events-auto inline-flex min-h-9 min-w-9 cursor-pointer items-center justify-center rounded-lg text-slate-500 hover:bg-indigo-50">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                disabled={reachedLimit}
-                                onChange={() => toggleSelectNote(note.id)}
-                                aria-label={`${isSelected ? "Batalkan pilihan" : "Pilih"} catatan ${note.title}`}
-                                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 disabled:opacity-40"
-                              />
-                            </label>
-                          )}
-                          <button
-                            type="button"
-                            aria-label={`Menu tindakan untuk ${note.title}`}
-                            aria-haspopup="menu"
-                            aria-expanded={openMenuId === note.id}
-                            aria-controls={openMenuId === note.id ? `note-menu-${note.id}` : undefined}
-                            onClick={(event) => toggleNoteMenu(note.id, event.currentTarget)}
-                            className="pointer-events-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xl leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600"
-                          >
-                            <span aria-hidden="true">⋯</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm text-slate-600">
-                        {note.summary || note.contentPreview || "Tidak ada isi teks."}
-                      </p>
-
-                      {note.tags && note.tags.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {note.tags.map((tag) => (
-                            <button
-                              key={tag}
-                              type="button"
-                              onClick={() => updateQueryParams({ tag, page: 1 })}
-                              className="pointer-events-auto rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
-                            >
-                              #{tag}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-3">
-                      <span className="text-xs text-slate-400">
-                        {formatDate(note.updatedAt)}
-                      </span>
-                      {isSelectionMode && reachedLimit && (
-                        <span className="text-xs text-slate-400">Maksimal 5 pilihan</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-            );
-          })}
-        </div>
+            {notes.map((note) => renderCard(note))}
+          </div>
         )}
 
-        {/* Kontrol Pagination */}
         <Pagination
           page={pagination.page}
           totalPages={pagination.totalPages}
@@ -760,20 +766,37 @@ export function NotesList() {
           disabled={isFetching}
           onPageChange={(newPage) => updateQueryParams({ page: newPage })}
         />
+
+        {!isInitialLoading && notes.length > 0 && !isSelectionMode && (
+          <div className="mt-8 flex items-center gap-4 rounded-2xl bg-indigo-50 p-4 text-sm text-indigo-800">
+            <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-indigo-600">
+              <Icon name="sparkle" className="h-5 w-5" />
+            </span>
+            <p>
+              <strong className="font-semibold">Tips:</strong> buka catatan lalu tekan Ringkasan AI untuk
+              versi singkatnya. Teks aslimu tidak pernah diubah.
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Dialog Konfirmasi Hapus */}
       <ConfirmDialog
         isOpen={Boolean(noteToDelete)}
-        title="Hapus catatan?"
-        message="Catatan ini akan dihapus permanen dan tidak dapat dikembalikan."
-        confirmLabel="Hapus"
+        title="Hapus catatan ini?"
+        message={
+          noteToDelete
+            ? `“${noteToDelete.title}” beserta ringkasan AI-nya akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.`
+            : ""
+        }
+        confirmLabel="Hapus catatan"
         cancelLabel="Batal"
         isLoading={isDeleting}
         onConfirm={handleConfirmDelete}
         onCancel={() => setNoteToDelete(null)}
       />
-      {openMenuNote && menuPosition && typeof document !== "undefined" &&
+      {openMenuNote &&
+        menuPosition &&
+        typeof document !== "undefined" &&
         createPortal(
           <div
             ref={menuRef}
@@ -790,10 +813,12 @@ export function NotesList() {
               }
             }}
             style={{ left: menuPosition.left, top: menuPosition.top }}
-            className="fixed z-[70] w-52 rounded-xl bg-white p-1 shadow-xl ring-1 ring-slate-200"
+            className="fixed z-[70] w-52 rounded-xl bg-white p-1.5 shadow-xl ring-1 ring-slate-200"
           >
             <button
-              ref={(element) => { menuItemRefs.current[0] = element; }}
+              ref={(element) => {
+                menuItemRefs.current[0] = element;
+              }}
               type="button"
               role="menuitem"
               onClick={() => {
@@ -801,32 +826,39 @@ export function NotesList() {
                 setOpenMenuId(null);
                 router.push(`/notes/${openMenuNote.id}?edit=true`);
               }}
-              className="flex min-h-10 w-full items-center rounded-lg px-3 text-left text-sm text-slate-700 hover:bg-slate-100 focus:bg-slate-100 focus:outline-none"
+              className="flex min-h-10 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100 focus:outline-none"
             >
+              <Icon name="edit" className="h-4 w-4 text-slate-500" />
               Ubah
             </button>
             <button
-              ref={(element) => { menuItemRefs.current[1] = element; }}
+              ref={(element) => {
+                menuItemRefs.current[1] = element;
+              }}
               type="button"
               role="menuitem"
               onClick={() => {
                 startSelectionWith(openMenuNote.id);
                 menuTriggerRef.current?.focus();
               }}
-              className="flex min-h-10 w-full items-center rounded-lg px-3 text-left text-sm text-slate-700 hover:bg-slate-100 focus:bg-slate-100 focus:outline-none"
+              className="flex min-h-10 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100 focus:outline-none"
             >
+              <Icon name="merge" className="h-4 w-4 text-slate-500" />
               Gabungkan dengan…
             </button>
             <button
-              ref={(element) => { menuItemRefs.current[2] = element; }}
+              ref={(element) => {
+                menuItemRefs.current[2] = element;
+              }}
               type="button"
               role="menuitem"
               onClick={() => {
                 setOpenMenuId(null);
                 setNoteToDelete(openMenuNote);
               }}
-              className="flex min-h-10 w-full items-center rounded-lg px-3 text-left text-sm text-red-600 hover:bg-red-50 focus:bg-red-50 focus:outline-none"
+              className="flex min-h-10 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium text-red-600 hover:bg-red-50 focus:bg-red-50 focus:outline-none"
             >
+              <Icon name="trash" className="h-4 w-4" />
               Hapus
             </button>
           </div>,

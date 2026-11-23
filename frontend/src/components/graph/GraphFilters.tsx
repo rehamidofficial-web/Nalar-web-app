@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { GRAPH_THEMES, GraphThemeName } from "@/lib/graphTheme";
 
 export interface FilterState {
   tipe: "semua" | "similar" | "concept";
@@ -11,6 +12,7 @@ export interface FilterState {
 
 interface GraphFiltersProps {
   filters: FilterState;
+  themeName: GraphThemeName;
   availableTags: string[];
   totalCatatan: number;
   jumlahNode: number;
@@ -24,6 +26,7 @@ interface GraphFiltersProps {
 
 export function GraphFilters({
   filters,
+  themeName,
   availableTags,
   totalCatatan,
   jumlahNode,
@@ -35,19 +38,24 @@ export function GraphFilters({
   onResetZoom,
 }: GraphFiltersProps) {
   const [isCollapsedMobile, setIsCollapsedMobile] = useState(true);
+  const theme = GRAPH_THEMES[themeName];
 
   return (
-    <div className="bg-white border-b border-slate-200 p-3 sm:p-4 text-sm select-none">
+    <div
+      className="select-none border-b p-3 text-sm sm:p-4"
+      style={{ backgroundColor: theme.ui.panel, borderColor: theme.ui.border, color: theme.ui.text }}
+    >
       {/* Baris Atas: Ringkasan info & Tombol kontrol tampilan & toggle HP */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-slate-700">
+          <span className="font-medium" style={{ color: theme.ui.text }}>
             {jumlahNode} catatan, {jumlahEdge} hubungan
           </span>
 
           {terpotong && (
             <span
-              className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full"
+              className="rounded-full border px-2 py-0.5 text-xs"
+              style={{ color: theme.ui.text, backgroundColor: theme.ui.panelAlt, borderColor: theme.ui.border }}
               title={`Menampilkan ${jumlahNode} dari total ${totalCatatan} catatan terbaru. Gunakan filter tag untuk mempersempit.`}
             >
               Menampilkan {jumlahNode} dari {totalCatatan} (terpotong)
@@ -61,7 +69,8 @@ export function GraphFilters({
             <button
               type="button"
               onClick={onFitGraph}
-              className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md border border-slate-200 transition-colors"
+              className="rounded-md border px-2.5 py-1 text-xs font-medium transition-colors"
+              style={{ color: theme.ui.text, backgroundColor: theme.ui.control, borderColor: theme.ui.border }}
               title="Sesuaikan tampilan ke layar"
             >
               Pas ke Layar
@@ -72,7 +81,8 @@ export function GraphFilters({
             <button
               type="button"
               onClick={onResetZoom}
-              className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md border border-slate-200 transition-colors"
+              className="rounded-md border px-2.5 py-1 text-xs font-medium transition-colors"
+              style={{ color: theme.ui.text, backgroundColor: theme.ui.control, borderColor: theme.ui.border }}
               title="Setel ulang posisi dan perbesaran"
             >
               Setel Ulang
@@ -83,7 +93,8 @@ export function GraphFilters({
           <button
             type="button"
             onClick={() => setIsCollapsedMobile(!isCollapsedMobile)}
-            className="sm:hidden px-2.5 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-md border border-indigo-100 transition-colors"
+            className="rounded-md border px-2.5 py-1 text-xs font-medium transition-colors sm:hidden"
+            style={{ color: theme.ui.accentText, backgroundColor: theme.ui.selected, borderColor: theme.ui.border }}
           >
             {isCollapsedMobile ? "Buka Filter" : "Tutup Filter"}
           </button>
@@ -92,13 +103,14 @@ export function GraphFilters({
 
       {/* Baris Filter (Bisa dilipat di HP) */}
       <div
-        className={`mt-3 pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end transition-all ${
+        className={`mt-3 grid grid-cols-1 items-end gap-3 border-t pt-3 transition-all sm:grid-cols-2 lg:grid-cols-4 ${
           isCollapsedMobile ? "hidden sm:grid" : "grid"
         }`}
+        style={{ borderColor: theme.ui.border }}
       >
         {/* 1. Jenis Relasi */}
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">
+          <label className="mb-1 block text-xs font-medium" style={{ color: theme.ui.muted }}>
             Jenis Hubungan
           </label>
           <select
@@ -108,7 +120,8 @@ export function GraphFilters({
                 tipe: e.target.value as "semua" | "similar" | "concept",
               })
             }
-            className="w-full text-xs rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            className="w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2"
+            style={{ backgroundColor: theme.ui.control, borderColor: theme.ui.border, color: theme.ui.text, accentColor: theme.ui.accent }}
           >
             <option value="semua">Semua Hubungan</option>
             <option value="similar">Makna Mirip</option>
@@ -119,10 +132,10 @@ export function GraphFilters({
         {/* 2. Slider Skor Minimal */}
         <div>
           <div className="flex justify-between items-center mb-1">
-            <label className="text-xs font-medium text-slate-600">
+            <label className="text-xs font-medium" style={{ color: theme.ui.muted }}>
               Skor Minimal
             </label>
-            <span className="text-xs font-semibold text-indigo-600">
+            <span className="text-xs font-semibold" style={{ color: theme.ui.accentText }}>
               {Math.round(filters.skorMin * 100)}%
             </span>
           </div>
@@ -136,7 +149,8 @@ export function GraphFilters({
               onFilterChange({ skorMin: parseFloat(e.target.value) })
             }
             disabled={filters.tipe === "concept"}
-            className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600 disabled:opacity-40"
+            className="h-1.5 w-full cursor-pointer appearance-none rounded-lg disabled:opacity-40"
+            style={{ accentColor: theme.ui.accent }}
             title={
               filters.tipe === "concept"
                 ? "Hanya berlaku untuk hubungan Makna Mirip"
@@ -147,13 +161,14 @@ export function GraphFilters({
 
         {/* 3. Pilihan Tag */}
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">
+          <label className="mb-1 block text-xs font-medium" style={{ color: theme.ui.muted }}>
             Saring Tag
           </label>
           <select
             value={filters.tag}
             onChange={(e) => onFilterChange({ tag: e.target.value })}
-            className="w-full text-xs rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            className="w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-hidden focus:ring-2"
+            style={{ backgroundColor: theme.ui.control, borderColor: theme.ui.border, color: theme.ui.text, accentColor: theme.ui.accent }}
           >
             <option value="">Semua Tag</option>
             {availableTags.map((t) => (
@@ -167,7 +182,7 @@ export function GraphFilters({
         {/* 4. Cari Judul & Tombol Reset */}
         <div className="flex items-center gap-2">
           <div className="flex-1">
-            <label className="block text-xs font-medium text-slate-600 mb-1">
+            <label className="mb-1 block text-xs font-medium" style={{ color: theme.ui.muted }}>
               Cari Judul
             </label>
             <input
@@ -175,7 +190,8 @@ export function GraphFilters({
               placeholder="Sorot judul..."
               value={filters.cariJudul}
               onChange={(e) => onFilterChange({ cariJudul: e.target.value })}
-              className="w-full text-xs rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-slate-700 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full rounded-md border px-2.5 py-1.5 text-xs placeholder:text-slate-400 focus:outline-hidden focus:ring-2"
+              style={{ backgroundColor: theme.ui.control, borderColor: theme.ui.border, color: theme.ui.text, accentColor: theme.ui.accent }}
             />
           </div>
 
@@ -183,7 +199,8 @@ export function GraphFilters({
             <button
               type="button"
               onClick={onResetFilters}
-              className="py-1.5 px-3 text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-md border border-slate-200 transition-colors"
+              className="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
+              style={{ color: theme.ui.text, backgroundColor: theme.ui.control, borderColor: theme.ui.border }}
               title="Atur ulang semua filter"
             >
               Reset

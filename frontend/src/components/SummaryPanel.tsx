@@ -57,8 +57,8 @@ export function SummaryPanel({
   const hasSummary = Boolean(summary && summary.trim().length > 0);
 
   return (
-    <div className="mt-8 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 sm:p-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="rounded-2xl bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] ring-1 ring-slate-200">
+      <div className="flex flex-col gap-4">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
             {/* Sparkles Icon */}
@@ -77,7 +77,7 @@ export function SummaryPanel({
             </svg>
           </div>
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Ringkasan AI</h2>
+            <h2 className="text-base font-bold text-slate-900">Ringkasan AI</h2>
             <p className="text-xs text-slate-500">
               Ringkas inti isi catatanmu dalam beberapa kalimat.
             </p>
@@ -89,12 +89,12 @@ export function SummaryPanel({
           onClick={handleSummarize}
           disabled={isLoading || isDirty}
           aria-busy={isLoading}
-          className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isLoading ? (
             <span className="flex items-center gap-2">
               <svg
-                className="h-4 w-4 animate-spin text-white"
+                className="h-4 w-4 animate-spin text-indigo-700"
                 fill="none"
                 viewBox="0 0 24 24"
               >
@@ -123,13 +123,13 @@ export function SummaryPanel({
       </div>
 
       {isDirty && (
-        <p className="mt-3 text-xs text-amber-600">
+        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
           * Simpan perubahan dulu agar ringkasan memakai isi catatan terbaru.
         </p>
       )}
 
       {errorMessage && (
-        <div className="mt-4 flex flex-col gap-2 rounded-lg bg-red-50 p-4 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
+        <div role="alert" className="mt-4 flex flex-col gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           <span>{errorMessage}</span>
           <button
             type="button"
@@ -142,15 +142,15 @@ export function SummaryPanel({
       )}
 
       {/* Area Hasil Ringkasan */}
-      <div className="mt-5 rounded-xl border border-slate-100 bg-slate-50 p-4" aria-live="polite">
+      <div className="mt-4" aria-live="polite">
         {hasSummary ? (
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-800">
+              <span className="inline-flex items-center rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-semibold text-violet-700">
                 Dibuat oleh AI
               </span>
             </div>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
               {summary}
             </p>
             {isTruncated && (
@@ -160,7 +160,7 @@ export function SummaryPanel({
             )}
           </div>
         ) : (
-          <p className="text-sm italic text-slate-400">Belum ada ringkasan.</p>
+          <p className="text-sm text-slate-500">Belum ada ringkasan.</p>
         )}
       </div>
     </div>

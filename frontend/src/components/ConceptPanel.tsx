@@ -63,8 +63,8 @@ export function ConceptPanel({
   const hasConcepts = concepts.length > 0;
 
   return (
-    <div className="mt-8 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 sm:p-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="rounded-2xl bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] ring-1 ring-slate-200">
+      <div className="flex flex-col gap-4">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
             {/* Tag / Lightbulb Icon */}
@@ -83,7 +83,7 @@ export function ConceptPanel({
             </svg>
           </div>
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Konsep Utama</h2>
+            <h2 className="text-base font-bold text-slate-900">Konsep Utama</h2>
             <p className="text-xs text-slate-500">
               Ide dan topik kunci yang diekstrak oleh AI dari catatan ini.
             </p>
@@ -95,12 +95,12 @@ export function ConceptPanel({
           onClick={handleExtractConcepts}
           disabled={isLoading || isDirty}
           aria-busy={isLoading}
-          className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isLoading ? (
             <span className="flex items-center gap-2">
               <svg
-                className="h-4 w-4 animate-spin text-white"
+                className="h-4 w-4 animate-spin text-indigo-700"
                 fill="none"
                 viewBox="0 0 24 24"
               >
@@ -129,13 +129,13 @@ export function ConceptPanel({
       </div>
 
       {isDirty && (
-        <p className="mt-3 text-xs text-amber-600">
+        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
           * Simpan perubahan dulu agar konsep memakai isi terbaru.
         </p>
       )}
 
       {errorMessage && (
-        <div className="mt-4 flex flex-col gap-2 rounded-lg bg-red-50 p-4 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
+        <div role="alert" className="mt-4 flex flex-col gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           <span>{errorMessage}</span>
           <button
             type="button"
@@ -148,14 +148,14 @@ export function ConceptPanel({
       )}
 
       {/* Area Daftar Chip Konsep */}
-      <div className="mt-5 rounded-xl border border-slate-100 bg-slate-50 p-4" aria-live="polite">
+      <div className="mt-4" aria-live="polite">
         {hasConcepts ? (
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
               {concepts.map((concept) => (
                 <span
                   key={concept.id}
-                  className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200/60"
+                  className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-700"
                 >
                   {concept.name}
                 </span>
@@ -184,7 +184,7 @@ export function ConceptPanel({
             )}
           </div>
         ) : (
-          <p className="text-sm italic text-slate-400">Belum ada konsep.</p>
+          <p className="text-sm text-slate-500">Belum ada konsep.</p>
         )}
       </div>
     </div>

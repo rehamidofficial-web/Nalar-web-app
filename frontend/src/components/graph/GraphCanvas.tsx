@@ -1,445 +1,533 @@
 "use client";
 
-import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
-import ForceGraph2D, { ForceGraphMethods, NodeObject, LinkObject } from "react-force-graph-2d";
-import { GraphNode, GraphEdge } from "@/types/graph";
-import { GRAPH_THEME } from "@/lib/graphTheme";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ForceGraph2D, {
+  ForceGraphMethods,
+  LinkObject as ForceLinkObject,
+  NodeObject as ForceNodeObject,
+} from "react-force-graph-2d";
+import { GraphEdge, GraphNode } from "@/types/graph";
+import { GRAPH_THEMES, GraphThemeName } from "@/lib/graphTheme";
 
 interface GraphCanvasProps {
   nodes: GraphNode[];
   edges: GraphEdge[];
   selectedNodeId: string | null;
-  highlightedNodeIds?: Set<string>;
-  searchQuery?: string;
-  onSelectNode: (node: GraphNode | null) => void;
-  onFitGraphReady?: (fitFn: () => void, resetFn: () => void) => void;
+  searchQuery: string;
+  themeName: GraphThemeName;
+  onSelectNode: (node: GraphNode) => void;
+  onFitGraphReady: (fit: () => void, reset: () => void) => void;
+}
+
+interface LabelCandidate {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  radius: number;
+  priority: number;
+}
+
+interface LabelBounds {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+interface PeripheralNode {
+  id?: string | number;
+  x?: number;
+  y?: number;
+  vx?: number;
+  vy?: number;
+}
+
+type PeripheralForce = ((alpha: number) => void) & {
+  initialize?: (nodes: PeripheralNode[]) => void;
+};
+
+function getEndpointId(endpoint: GraphEdge["source"]) {
+  return typeof endpoint === "string" ? endpoint : endpoint.id;
+}
+
+function nodeRadius(node: GraphNode, theme: (typeof GRAPH_THEMES)[GraphThemeName]) {
+  return Math.min(
+    theme.node.maxRadius,
+    Math.max(
+      theme.node.minRadius,
+      theme.node.baseRadius + Math.max(0, node.jumlahHubungan) * theme.node.radiusPerRelation,
+    ),
+  );
+}
+
+function nodeColor(node: GraphNode, theme: (typeof GRAPH_THEMES)[GraphThemeName]) {
+  if (node.pusat) return theme.node.centerFill;
+  if (!node.tags.length) return theme.node.neutralFill;
+
+  const tag = node.tags[0].toLocaleLowerCase();
+  let hash = 0;
+  for (let index = 0; index < tag.length; index += 1) {
+    hash = (hash * 31 + tag.charCodeAt(index)) | 0;
+  }
+  return theme.node.tagColors[Math.abs(hash) % theme.node.tagColors.length];
+}
+
+function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+
+  let low = 0;
+  let high = text.length;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (ctx.measureText(`${text.slice(0, middle)}…`).width <= maxWidth) {
+      low = middle;
+    } else {
+      high = middle - 1;
+    }
+  }
+  return `${text.slice(0, low).trimEnd()}…`;
+}
+
+function endpointsOverlap(left: LabelBounds, right: LabelBounds) {
+  return (
+    left.left < right.right &&
+    left.right > right.left &&
+    left.top < right.bottom &&
+    left.bottom > right.top
+  );
 }
 
 export default function GraphCanvas({
   nodes,
   edges,
   selectedNodeId,
-  highlightedNodeIds,
-  searchQuery = "",
+  searchQuery,
+  themeName,
   onSelectNode,
   onFitGraphReady,
 }: GraphCanvasProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const fgRef = useRef<ForceGraphMethods<NodeObject<GraphNode>, LinkObject<GraphNode, GraphEdge>> | undefined>(undefined);
-  const [dimensions, setDimensions] = useState({ width: 600, height: 500 });
+  const theme = GRAPH_THEMES[themeName];
+  const graphRef = useRef<
+    ForceGraphMethods<ForceNodeObject, ForceLinkObject<object, GraphEdge>> | undefined
+  >(undefined);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const labelCandidatesRef = useRef<LabelCandidate[]>([]);
+  const didInitialFitRef = useRef(false);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const isHeavyGraph = nodes.length >= theme.performance.heavyThreshold;
 
-  const isHeavyGraph = nodes.length > GRAPH_THEME.performance.heavyThreshold;
-
-  // ResizeObserver untuk menyesuaikan kanvas dengan ukuran wadah
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
 
-    const updateSize = () => {
-      if (containerRef.current) {
-        setDimensions({
-          width: containerRef.current.clientWidth || 600,
-          height: containerRef.current.clientHeight || 500,
-        });
-      }
-    };
-
-    updateSize();
-
-    const resizeObserver = new ResizeObserver(() => {
-      updateSize();
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      const width = Math.round(entry.contentRect.width);
+      const height = Math.round(entry.contentRect.height);
+      setCanvasSize((current) =>
+        current.width === width && current.height === height
+          ? current
+          : { width, height },
+      );
     });
-
-    resizeObserver.observe(containerRef.current);
-    return () => resizeObserver.disconnect();
+    observer.observe(container);
+    return () => observer.disconnect();
   }, []);
 
-  // Konfigurasi D3 Force Simulation agar kartu memiliki gaya tolak dan ruang yang cukup
-  useEffect(() => {
-    if (!fgRef.current) return;
-    const fg = fgRef.current;
-
-    // Atur gaya tolak manyBody (charge)
-    interface ForceWithStrength {
-      strength: (val: number) => void;
-    }
-    interface ForceWithDistance {
-      distance: (val: number) => void;
-    }
-
-    const charge = fg.d3Force("charge") as unknown as ForceWithStrength | undefined;
-    if (charge && typeof charge.strength === "function") {
-      charge.strength(GRAPH_THEME.physics.chargeStrength);
-    }
-
-    // Atur jarak pegas relasi (link)
-    const linkForce = fg.d3Force("link") as unknown as ForceWithDistance | undefined;
-    if (linkForce && typeof linkForce.distance === "function") {
-      linkForce.distance(GRAPH_THEME.physics.linkDistance);
-    }
-
-    // Hangatkan simulasi sesaat
-    fg.d3ReheatSimulation();
-  }, [nodes.length, edges.length]);
-
-  // Set tetangga dari node yang sedang di-hover atau selected
-  const activeFocusId = hoveredNodeId || selectedNodeId;
-  const connectedNeighbors = useMemo(() => {
-    const neighbors = new Set<string>();
-    if (!activeFocusId) return neighbors;
-
-    edges.forEach((edge) => {
-      const sourceId = typeof edge.source === "object" ? (edge.source as GraphNode).id : edge.source;
-      const targetId = typeof edge.target === "object" ? (edge.target as GraphNode).id : edge.target;
-
-      if (sourceId === activeFocusId) {
-        neighbors.add(targetId);
-      } else if (targetId === activeFocusId) {
-        neighbors.add(sourceId);
-      }
-    });
-
-    return neighbors;
-  }, [activeFocusId, edges]);
-
-  // Siapkan fungsi fit dan reset untuk parent component
-  const handleFit = useCallback(() => {
-    if (fgRef.current) {
-      fgRef.current.zoomToFit(400, 50);
-    }
-  }, []);
-
-  const handleReset = useCallback(() => {
-    if (fgRef.current) {
-      fgRef.current.centerAt(0, 0, 400);
-      fgRef.current.zoom(1, 400);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (onFitGraphReady) {
-      onFitGraphReady(handleFit, handleReset);
-    }
-  }, [onFitGraphReady, handleFit, handleReset]);
-
-  // Format data untuk react-force-graph
   const graphData = useMemo(() => {
-    return {
-      nodes: nodes.map((n) => ({ ...n })),
-      links: edges.map((e) => ({ ...e })),
-    };
-  }, [nodes, edges]);
+    const connectedIds = new Set<string>();
+    edges.forEach((edge) => {
+      connectedIds.add(getEndpointId(edge.source));
+      connectedIds.add(getEndpointId(edge.target));
+    });
+    const isolatedNodes = nodes.filter((node) => !connectedIds.has(node.id));
+    const isolatedIds = new Set(isolatedNodes.map((node) => node.id));
+    const connectedNodes = nodes.filter((node) => !isolatedIds.has(node.id));
+    const positions = new Map<string, { x: number; y: number }>();
 
-  // Auto zoomToFit saat awal data termuat
-  useEffect(() => {
-    if (nodes.length > 0 && fgRef.current) {
-      const timer = setTimeout(() => {
-        fgRef.current?.zoomToFit(400, 50);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
+    connectedNodes.forEach((node, index) => {
+      if (typeof node.x === "number" && typeof node.y === "number") {
+        positions.set(node.id, { x: node.x, y: node.y });
+        return;
+      }
+      const angle = index * 2.399963229728653;
+      const distance = 35 + Math.sqrt(index + 1) * theme.physics.linkDistance * 0.28;
+      positions.set(node.id, {
+        x: Math.cos(angle) * distance,
+        y: Math.sin(angle) * distance,
+      });
+    });
+
+    isolatedNodes.forEach((node, index) => {
+      if (typeof node.x === "number" && typeof node.y === "number") {
+        positions.set(node.id, { x: node.x, y: node.y });
+        return;
+      }
+      const angle = (index / Math.max(1, isolatedNodes.length)) * Math.PI * 2;
+      const distance =
+        theme.physics.isolatedRadius +
+        Math.sqrt(index) * theme.physics.isolatedSpacing;
+      positions.set(node.id, {
+        x: Math.cos(angle) * distance,
+        y: Math.sin(angle) * distance,
+      });
+    });
+
+    return {
+      nodes: nodes.map((node) => ({
+        ...node,
+        ...positions.get(node.id),
+      })),
+      links: edges.map((edge) => ({
+        ...edge,
+        source: typeof edge.source === "string" ? edge.source : edge.source.id,
+        target: typeof edge.target === "string" ? edge.target : edge.target.id,
+      })),
+    };
+  }, [edges, nodes, theme.physics.isolatedRadius, theme.physics.isolatedSpacing, theme.physics.linkDistance]);
+
+  const neighboringNodeIds = useMemo(() => {
+    if (!hoveredNodeId && !selectedNodeId) return new Set<string>();
+    const focusId = hoveredNodeId || selectedNodeId;
+    const neighbors = new Set<string>();
+    edges.forEach((edge) => {
+      const sourceId = typeof edge.source === "string" ? edge.source : edge.source.id;
+      const targetId = typeof edge.target === "string" ? edge.target : edge.target.id;
+      if (sourceId === focusId) neighbors.add(targetId);
+      if (targetId === focusId) neighbors.add(sourceId);
+    });
+    return neighbors;
+  }, [edges, hoveredNodeId, selectedNodeId]);
+
+  const highestDegreeNodeId = useMemo(() => {
+    if (!nodes.length) return null;
+    return nodes.reduce((highest, node) =>
+      node.jumlahHubungan > highest.jumlahHubungan ? node : highest,
+    ).id;
   }, [nodes]);
 
-  // Hitung dimensi kartu kertas berdasarkan jumlah relasi
-  const getCardDimensions = useCallback((node: GraphNode) => {
-    const count = node.jumlahHubungan || 0;
-    const baseW = GRAPH_THEME.card.baseWidth;
-    const width = Math.min(
-      Math.max(baseW + count * 2.8, GRAPH_THEME.card.minWidth),
-      GRAPH_THEME.card.maxWidth
-    );
-    const height = width * GRAPH_THEME.card.heightRatio;
-    return { width, height };
+  const peripheralForce = useMemo<PeripheralForce>(() => {
+    let isolatedNodes: PeripheralNode[] = [];
+    const force: PeripheralForce = (alpha) => {
+      isolatedNodes.forEach((node, index) => {
+        const angle = (index / Math.max(1, isolatedNodes.length)) * Math.PI * 2;
+        const targetRadius =
+          theme.physics.isolatedRadius +
+          Math.sqrt(index) * theme.physics.isolatedSpacing;
+        const currentRadius = Math.hypot(node.x || 0, node.y || 0) || 1;
+        const adjustment = (targetRadius - currentRadius) * alpha * 0.018;
+        node.vx = (node.vx || 0) + Math.cos(angle) * adjustment;
+        node.vy = (node.vy || 0) + Math.sin(angle) * adjustment;
+      });
+    };
+    force.initialize = (simulationNodes) => {
+      const connectedIds = new Set<string>();
+      edges.forEach((edge) => {
+        connectedIds.add(getEndpointId(edge.source));
+        connectedIds.add(getEndpointId(edge.target));
+      });
+      isolatedNodes = simulationNodes.filter(
+        (node) => typeof node.id === "string" && !connectedIds.has(node.id),
+      );
+    };
+    return force;
+  }, [edges, theme.physics.isolatedRadius, theme.physics.isolatedSpacing]);
+
+  const fitGraph = useCallback(() => {
+    graphRef.current?.zoomToFit(500, theme.performance.fitPadding);
+  }, [theme.performance.fitPadding]);
+
+  const resetGraph = useCallback(() => {
+    graphRef.current?.centerAt(0, 0, 500);
+    graphRef.current?.zoom(1, 500);
   }, []);
 
-  // Helper menggambar rounded rect di kanvas
-  const drawRoundedRect = (
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    radius: number
-  ) => {
-    ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + width - radius, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-    ctx.lineTo(x + width, y + height - radius);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    ctx.lineTo(x + radius, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
-    ctx.closePath();
-  };
+  useEffect(() => {
+    onFitGraphReady(fitGraph, resetGraph);
+    return () => onFitGraphReady(() => undefined, () => undefined);
+  }, [fitGraph, onFitGraphReady, resetGraph]);
 
-  // Custom node canvas paint: Kartu Catatan Kertas + Penjepit/Pin
+  useEffect(() => {
+    const graph = graphRef.current;
+    if (!graph) return;
+    graph.d3Force("charge")?.strength(theme.physics.chargeStrength);
+    graph.d3Force("link")?.distance(theme.physics.linkDistance);
+    graph.d3Force("center")?.strength(theme.physics.centerStrength);
+    graph.d3Force("peripheral", peripheralForce);
+    graph.d3ReheatSimulation();
+  }, [canvasSize.height, canvasSize.width, peripheralForce, theme.physics]);
+
+  const handleEngineStop = useCallback(() => {
+    if (didInitialFitRef.current || !nodes.length) return;
+    didInitialFitRef.current = true;
+    fitGraph();
+  }, [fitGraph, nodes.length]);
+
   const paintNode = useCallback(
-    (nodeObj: NodeObject<GraphNode>, ctx: CanvasRenderingContext2D, globalScale: number) => {
-      const node = nodeObj as GraphNode;
-      const nodeX = node.x ?? 0;
-      const nodeY = node.y ?? 0;
-      const { width, height } = getCardDimensions(node);
-
-      const isSelected = selectedNodeId === node.id;
+    (nodeObject: object, ctx: CanvasRenderingContext2D, globalScale: number) => {
+      const node = nodeObject as GraphNode;
+      const radius = nodeRadius(node, theme);
       const isHovered = hoveredNodeId === node.id;
-      const isConnected = connectedNeighbors.has(node.id);
-      const isSearched =
+      const isSelected = selectedNodeId === node.id;
+      const isNeighbor = neighboringNodeIds.has(node.id);
+      const isSearchMatch =
         searchQuery.trim().length > 0 &&
-        node.label.toLowerCase().includes(searchQuery.toLowerCase().trim());
-      const isExplicitlyHighlighted = highlightedNodeIds?.has(node.id);
-
-      const isFocused = isSelected || isHovered || isExplicitlyHighlighted;
-      const hasActiveContext = Boolean(activeFocusId);
-      const isDimmed = hasActiveContext && !isFocused && !isConnected;
-
-      const cardLeft = nodeX - width / 2;
-      const cardTop = nodeY - height / 2;
+        node.label.toLocaleLowerCase().includes(searchQuery.trim().toLocaleLowerCase());
+      const isFocused = isHovered || isSelected || isNeighbor || isSearchMatch;
+      const hasFocus = Boolean(hoveredNodeId || selectedNodeId);
+      const shouldShowLabel =
+        isHovered ||
+        isSelected ||
+        isSearchMatch ||
+        node.id === highestDegreeNodeId ||
+        globalScale >= theme.performance.zoomToShowLabels;
 
       ctx.save();
-
-      // Bayangan kartu (jika tidak sedang grafik berat)
-      if (!isHeavyGraph && !isDimmed) {
-        ctx.shadowColor = isFocused ? "rgba(225, 29, 72, 0.45)" : GRAPH_THEME.card.shadowColor;
-        ctx.shadowBlur = isFocused ? 10 : GRAPH_THEME.card.shadowBlur;
-        ctx.shadowOffsetY = isFocused ? 4 : 2;
+      ctx.globalAlpha = hasFocus && !isFocused ? theme.node.dimmedOpacity : 1;
+      if (!isHeavyGraph && (isHovered || isSelected || isNeighbor)) {
+        ctx.shadowColor = isSelected || isHovered ? theme.node.centerHighlight : nodeColor(node, theme);
+        ctx.shadowBlur = theme.performance.glowBlur;
       }
-
-      // Warna isi kertas
-      let cardBg = GRAPH_THEME.card.defaultBg;
-      if (node.pusat) {
-        cardBg = GRAPH_THEME.card.centerBg;
-      } else if (node.jumlahHubungan === 0) {
-        cardBg = GRAPH_THEME.card.isolatedBg;
-      }
-
-      if (isFocused) {
-        cardBg = GRAPH_THEME.card.selectedBg;
-      } else if (isDimmed) {
-        cardBg = GRAPH_THEME.card.dimmedBg;
-      }
-
-      // 1. Gambar Lembaran Kertas Kartu
-      drawRoundedRect(ctx, cardLeft, cardTop, width, height, GRAPH_THEME.card.radius);
-      ctx.fillStyle = cardBg;
-      ctx.fill();
-
-      // Matikan bayangan untuk stroke & elemen detail di atasnya
-      ctx.shadowColor = "transparent";
-
-      // Border kertas
-      ctx.lineWidth = isFocused ? 2 : 1;
-      ctx.strokeStyle = isFocused
-        ? GRAPH_THEME.card.borderHighlight
-        : isSearched
-        ? "#f59e0b"
-        : isDimmed
-        ? "rgba(255, 255, 255, 0.08)"
-        : GRAPH_THEME.card.borderColor;
-      ctx.stroke();
-
-      // 2. Gambar Penjepit Kertas / Pin Detektif di bagian atas kartu
-      const pinX = nodeX;
-      const pinY = cardTop + 1;
-
-      // Klip Kertas Logam (U-clip)
       ctx.beginPath();
-      ctx.strokeStyle = isFocused ? GRAPH_THEME.card.paperclipHighlight : GRAPH_THEME.card.paperclipColor;
-      ctx.lineWidth = 1.4;
-      ctx.roundRect(pinX - 4, pinY - 4, 8, 10, 3);
-      ctx.stroke();
-
-      // Pin Merah Bundar di tengah klip (identitas Benang Merah Nalar)
-      ctx.beginPath();
-      ctx.arc(pinX, pinY - 2, GRAPH_THEME.card.pinRadius, 0, 2 * Math.PI, false);
-      ctx.fillStyle = isDimmed
-        ? "#78350f"
-        : node.pusat
-        ? GRAPH_THEME.card.pinCenterColor
-        : isFocused
-        ? GRAPH_THEME.card.pinHighlight
-        : GRAPH_THEME.card.pinColor;
+      ctx.arc(node.x || 0, node.y || 0, radius, 0, Math.PI * 2);
+      ctx.fillStyle = nodeColor(node, theme);
       ctx.fill();
-      ctx.lineWidth = 0.8;
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+      ctx.lineWidth = (isSelected || isHovered ? 2.5 : 1.25) / Math.max(globalScale, 0.1);
+      ctx.strokeStyle =
+        isSelected || isHovered
+          ? theme.node.activeBorder
+          : node.pusat
+            ? theme.node.centerHighlight
+            : theme.node.neutralBorder;
       ctx.stroke();
+      ctx.restore();
 
-      // 3. Teks Judul Catatan di dalam Kertas
-      const rawTitle = node.label || "";
-      // Potong judul agar muat rapi di kartu kecil
-      const maxChars = width > 75 ? 20 : 13;
-      const displayTitle = rawTitle.length > maxChars ? rawTitle.slice(0, maxChars - 1) + "…" : rawTitle;
+      if (!shouldShowLabel || !node.label) return;
+      const priority = isSelected ? 5 : isHovered ? 4 : isSearchMatch ? 3 : node.id === highestDegreeNodeId ? 2 : 1;
+      labelCandidatesRef.current.push({
+        id: node.id,
+        text: node.label,
+        x: node.x || 0,
+        y: node.y || 0,
+        radius,
+        priority,
+      });
+    },
+    [
+      highestDegreeNodeId,
+      hoveredNodeId,
+      isHeavyGraph,
+      neighboringNodeIds,
+      searchQuery,
+      selectedNodeId,
+      theme,
+    ],
+  );
 
-      const fontSize = Math.max(9 / Math.max(globalScale, 0.8), 7.5);
-      ctx.font = `600 ${fontSize}px ${GRAPH_THEME.card.fontFamily}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
+  const paintLink = useCallback(
+    (linkObject: object, ctx: CanvasRenderingContext2D, globalScale: number) => {
+      const link = linkObject as GraphEdge;
+      if (typeof link.source === "string" || typeof link.target === "string") return;
+      const source = link.source;
+      const target = link.target;
+      const dx = (target.x || 0) - (source.x || 0);
+      const dy = (target.y || 0) - (source.y || 0);
+      const distance = Math.hypot(dx, dy);
+      if (!distance) return;
 
-      ctx.fillStyle = isDimmed
-        ? GRAPH_THEME.card.textDimmedColor
-        : isFocused
-        ? "#0f172a"
-        : GRAPH_THEME.card.textColor;
+      const sourceRadius = nodeRadius(source, theme);
+      const targetRadius = nodeRadius(target, theme);
+      const unitX = dx / distance;
+      const unitY = dy / distance;
+      const startX = (source.x || 0) + unitX * sourceRadius;
+      const startY = (source.y || 0) + unitY * sourceRadius;
+      const endX = (target.x || 0) - unitX * targetRadius;
+      const endY = (target.y || 0) - unitY * targetRadius;
+      const isFocusedLink =
+        neighboringNodeIds.has(source.id) ||
+        neighboringNodeIds.has(target.id) ||
+        hoveredNodeId === source.id ||
+        hoveredNodeId === target.id ||
+        selectedNodeId === source.id ||
+        selectedNodeId === target.id;
+      const hasFocus = Boolean(hoveredNodeId || selectedNodeId);
+      const isSimilar = link.type === "similar";
+      const similarity = Math.min(1, Math.max(0, link.similarity || 0));
+      const curvature = isSimilar
+        ? theme.thread.curvature
+        : theme.thread.conceptCurvature;
+      const midpointX = (startX + endX) / 2;
+      const midpointY = (startY + endY) / 2;
+      const curveOffset = distance * curvature;
+      const controlX = midpointX - unitY * curveOffset;
+      const controlY = midpointY + unitX * curveOffset;
 
-      // Gambar judul di tengah kartu
-      ctx.fillText(displayTitle, nodeX, nodeY + 3);
-
+      ctx.save();
+      ctx.globalAlpha = hasFocus && !isFocusedLink ? 0.16 : 0.8;
+      ctx.strokeStyle = isSimilar
+        ? isFocusedLink
+          ? theme.thread.similarHighlight
+          : theme.thread.similarColor
+        : isFocusedLink
+          ? theme.thread.conceptHighlight
+          : theme.thread.conceptColor;
+      const baseWidth = isSimilar
+        ? theme.thread.similarMinWidth +
+          (theme.thread.similarMaxWidth - theme.thread.similarMinWidth) * similarity
+        : theme.thread.conceptWidth;
+      ctx.lineWidth = baseWidth / Math.max(globalScale, 0.1);
+      ctx.lineCap = "round";
+      ctx.setLineDash(isSimilar ? [] : theme.thread.dashPattern);
+      if (isFocusedLink && !isHeavyGraph) {
+        ctx.shadowColor = ctx.strokeStyle;
+        ctx.shadowBlur = theme.performance.glowBlur;
+      }
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.quadraticCurveTo(controlX, controlY, endX, endY);
+      ctx.stroke();
       ctx.restore();
     },
     [
-      getCardDimensions,
-      selectedNodeId,
       hoveredNodeId,
-      activeFocusId,
-      connectedNeighbors,
-      searchQuery,
-      highlightedNodeIds,
       isHeavyGraph,
-    ]
+      neighboringNodeIds,
+      selectedNodeId,
+      theme,
+    ],
   );
 
-  // Custom link canvas paint: Benang Merah Detektif (Melengkung) & Benang Putus-Putus
-  const paintLink = useCallback(
-    (linkObj: LinkObject<GraphNode, GraphEdge>, ctx: CanvasRenderingContext2D) => {
-      const link = linkObj as unknown as {
-        source: GraphNode | string;
-        target: GraphNode | string;
-        type: "similar" | "concept";
-        similarity: number | null;
-      };
+  const drawLabels = useCallback(
+    (ctx: CanvasRenderingContext2D, globalScale: number) => {
+      const candidates = labelCandidatesRef.current;
+      candidates.sort((left, right) => right.priority - left.priority || left.id.localeCompare(right.id));
 
-      const sourceNode = typeof link.source === "object" ? link.source : null;
-      const targetNode = typeof link.target === "object" ? link.target : null;
-
-      const sourceId = sourceNode ? sourceNode.id : (link.source as string);
-      const targetId = targetNode ? targetNode.id : (link.target as string);
-
-      const sourceX = sourceNode?.x ?? 0;
-      const sourceY = sourceNode?.y ?? 0;
-      const targetX = targetNode?.x ?? 0;
-      const targetY = targetNode?.y ?? 0;
-
-      const isConnectedToFocus =
-        activeFocusId && (sourceId === activeFocusId || targetId === activeFocusId);
-      const hasActiveContext = Boolean(activeFocusId);
-      const isDimmed = hasActiveContext && !isConnectedToFocus;
+      const fontSize = theme.node.labelFontSize / Math.max(globalScale, 0.1);
+      const maxWidth = theme.node.labelMaxWidth / Math.max(globalScale, 0.1);
+      const paddingX = 8 / Math.max(globalScale, 0.1);
+      const paddingY = 4 / Math.max(globalScale, 0.1);
+      const gap = theme.node.labelGap / Math.max(globalScale, 0.1);
+      const cellSize = theme.performance.labelGridCell / Math.max(globalScale, 0.1);
+      const grid = new Map<string, LabelBounds[]>();
 
       ctx.save();
+      ctx.font = `600 ${fontSize}px ${theme.node.labelFontFamily}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
 
-      const isSimilar = link.type === "similar";
-
-      // Warna & Ketebalan Benang
-      let strokeColor: string;
-      let lineWidth: number;
-
-      if (isSimilar) {
-        // Benang merah
-        if (isConnectedToFocus) {
-          strokeColor = GRAPH_THEME.thread.similarHighlight;
-          lineWidth = Math.max(2.2, (link.similarity || 0.6) * GRAPH_THEME.thread.similarMaxWidth + 1.2);
-          if (!isHeavyGraph) {
-            ctx.shadowColor = "rgba(225, 29, 72, 0.8)";
-            ctx.shadowBlur = 6;
+      candidates.forEach((candidate) => {
+        const text = truncateText(ctx, candidate.text, maxWidth);
+        const textWidth = ctx.measureText(text).width;
+        const bounds: LabelBounds = {
+          left: candidate.x - textWidth / 2 - paddingX,
+          top: candidate.y + candidate.radius + gap,
+          right: candidate.x + textWidth / 2 + paddingX,
+          bottom: candidate.y + candidate.radius + gap + fontSize + paddingY * 2,
+        };
+        const firstColumn = Math.floor(bounds.left / cellSize);
+        const lastColumn = Math.floor(bounds.right / cellSize);
+        const firstRow = Math.floor(bounds.top / cellSize);
+        const lastRow = Math.floor(bounds.bottom / cellSize);
+        const keys: string[] = [];
+        for (let column = firstColumn; column <= lastColumn; column += 1) {
+          for (let row = firstRow; row <= lastRow; row += 1) {
+            keys.push(`${column}:${row}`);
           }
-        } else if (isDimmed) {
-          strokeColor = GRAPH_THEME.thread.similarDimmed;
-          lineWidth = GRAPH_THEME.thread.similarMinWidth * 0.8;
-        } else {
-          strokeColor = GRAPH_THEME.thread.similarColor;
-          lineWidth = Math.max(
-            GRAPH_THEME.thread.similarMinWidth,
-            (link.similarity || 0.5) * GRAPH_THEME.thread.similarMaxWidth
-          );
         }
-      } else {
-        // Benang konsep (biru/kapur putus-putus)
-        if (isConnectedToFocus) {
-          strokeColor = GRAPH_THEME.thread.conceptHighlight;
-          lineWidth = GRAPH_THEME.thread.conceptWidth + 1;
-        } else if (isDimmed) {
-          strokeColor = GRAPH_THEME.thread.conceptDimmed;
-          lineWidth = GRAPH_THEME.thread.conceptWidth * 0.7;
-        } else {
-          strokeColor = GRAPH_THEME.thread.conceptColor;
-          lineWidth = GRAPH_THEME.thread.conceptWidth;
+        if (keys.some((key) => (grid.get(key) || []).some((placed) => endpointsOverlap(bounds, placed)))) {
+          return;
         }
-      }
+        keys.forEach((key) => {
+          const placed = grid.get(key) || [];
+          placed.push(bounds);
+          grid.set(key, placed);
+        });
 
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = lineWidth;
-
-      if (!isSimilar) {
-        ctx.setLineDash(GRAPH_THEME.thread.dashPattern);
-      } else {
-        ctx.setLineDash([]);
-      }
-
-      // Garis sedikit melengkung (lengkungan menggantung khas benang di papan)
-      const dx = targetX - sourceX;
-      const dy = targetY - sourceY;
-      const curvature = isSimilar ? GRAPH_THEME.thread.curvature : GRAPH_THEME.thread.conceptCurvature;
-
-      // Titik kontrol kurva Bézier kuadratik
-      const midX = (sourceX + targetX) / 2 - dy * curvature;
-      const midY = (sourceY + targetY) / 2 + dx * curvature;
-
-      ctx.beginPath();
-      ctx.moveTo(sourceX, sourceY);
-      ctx.quadraticCurveTo(midX, midY, targetX, targetY);
-      ctx.stroke();
-
+        const cornerRadius = 5 / Math.max(globalScale, 0.1);
+        ctx.beginPath();
+        ctx.roundRect(
+          bounds.left,
+          bounds.top,
+          bounds.right - bounds.left,
+          bounds.bottom - bounds.top,
+          cornerRadius,
+        );
+        ctx.fillStyle = theme.node.labelBackground;
+        ctx.fill();
+        ctx.strokeStyle = theme.node.labelBorder;
+        ctx.lineWidth = 0.8 / Math.max(globalScale, 0.1);
+        ctx.stroke();
+        ctx.fillStyle = theme.node.labelText;
+        ctx.fillText(text, candidate.x, bounds.top + paddingY, maxWidth);
+      });
+      labelCandidatesRef.current = [];
       ctx.restore();
     },
-    [activeFocusId, isHeavyGraph]
+    [theme],
   );
+
+  const handleNodeHover = useCallback((node: object | null) => {
+    setHoveredNodeId(node ? (node as GraphNode).id : null);
+  }, []);
 
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full min-h-[480px] overflow-hidden select-none"
-      style={{ backgroundColor: GRAPH_THEME.board.background }}
+      className="relative min-h-0 min-w-0 flex-1 overflow-hidden touch-none"
+      style={{
+        backgroundColor: theme.board.background,
+        backgroundImage: `radial-gradient(circle, ${theme.board.patternColor} 1px, transparent 1px)`,
+        backgroundSize: "26px 26px",
+      }}
       role="region"
-      aria-label="Kanvas Knowledge Graph interaktif bertema Papan Detektif. Gunakan tab Daftar untuk alternatif teks."
+      aria-label="Grafik hubungan antar catatan"
     >
-      <ForceGraph2D
-        ref={fgRef}
-        width={dimensions.width}
-        height={dimensions.height}
-        graphData={graphData}
-        nodeRelSize={GRAPH_THEME.card.baseWidth / 2}
-        nodeCanvasObject={paintNode}
-        nodePointerAreaPaint={(nodeObj, color, ctx) => {
-          const node = nodeObj as GraphNode;
-          const { width, height } = getCardDimensions(node);
-          ctx.fillStyle = color;
-          drawRoundedRect(
-            ctx,
-            (node.x ?? 0) - width / 2 - 2,
-            (node.y ?? 0) - height / 2 - 2,
-            width + 4,
-            height + 4,
-            GRAPH_THEME.card.radius
-          );
-          ctx.fill();
-        }}
-        linkCanvasObject={paintLink}
-        backgroundColor={GRAPH_THEME.board.background}
-        cooldownTicks={120}
-        d3VelocityDecay={GRAPH_THEME.physics.velocityDecay}
-        onNodeClick={(node) => {
-          onSelectNode(node as GraphNode);
-        }}
-        onBackgroundClick={() => {
-          onSelectNode(null);
-        }}
-        onNodeHover={(node) => {
-          setHoveredNodeId(node ? (node as GraphNode).id : null);
-        }}
-        enableNodeDrag={true}
-        enableZoomInteraction={true}
-        enablePanInteraction={true}
-      />
+      {canvasSize.width > 0 && canvasSize.height > 0 && (
+        <ForceGraph2D
+          ref={graphRef}
+          graphData={graphData}
+          width={canvasSize.width}
+          height={canvasSize.height}
+          backgroundColor={theme.board.background}
+          cooldownTicks={180}
+          d3AlphaDecay={0.035}
+          d3VelocityDecay={theme.physics.velocityDecay}
+          nodeId="id"
+          nodeCanvasObject={paintNode}
+          nodeCanvasObjectMode={() => "replace"}
+          nodePointerAreaPaint={(node, color, ctx) => {
+            const graphNode = node as GraphNode;
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(graphNode.x || 0, graphNode.y || 0, nodeRadius(graphNode, theme) + 5, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.restore();
+          }}
+          linkCanvasObject={paintLink}
+          linkCanvasObjectMode={() => "replace"}
+          onRenderFramePre={() => {
+            labelCandidatesRef.current = [];
+          }}
+          onRenderFramePost={drawLabels}
+          onNodeHover={handleNodeHover}
+          onNodeClick={(node) => onSelectNode(node as GraphNode)}
+          onBackgroundClick={() => setHoveredNodeId(null)}
+          onEngineStop={handleEngineStop}
+          enableNodeDrag
+          enableZoomInteraction
+          enablePanInteraction
+          minZoom={0.25}
+          maxZoom={8}
+        />
+      )}
+      {isHeavyGraph && (
+        <div className="pointer-events-none absolute bottom-2 left-3 rounded-full border border-white/10 bg-black/40 px-2.5 py-1 text-[10px] text-slate-300">
+          Efek visual disederhanakan untuk menjaga kelancaran
+        </div>
+      )}
     </div>
   );
 }

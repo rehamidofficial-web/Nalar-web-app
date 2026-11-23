@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRequireAuth } from "@/lib/useRequireAuth";
 import { AppShell } from "@/components/AppShell";
+import { Icon, cardClass, btnPrimary, inputClass } from "@/components/ui";
 import { apiFetch, pesanError } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { waktuRelatif } from "@/lib/format";
@@ -25,42 +27,57 @@ interface RecentNote {
   contentPreview: string;
 }
 
+function sapaan() {
+  const jam = new Date().getHours();
+  if (jam < 11) return "Selamat pagi";
+  if (jam < 15) return "Selamat siang";
+  if (jam < 18) return "Selamat sore";
+  return "Selamat malam";
+}
+
+const AKSI_CEPAT = [
+  {
+    href: "/notes/new",
+    icon: "plus" as const,
+    judul: "Tulis catatan baru",
+    isi: "Simpan sesuatu yang baru kamu pelajari",
+  },
+  {
+    href: "/assistant",
+    icon: "sparkle" as const,
+    judul: "Tanya Asisten AI",
+    isi: "Dapatkan jawaban dari catatanmu sendiri",
+  },
+  {
+    href: "/graph",
+    icon: "graph" as const,
+    judul: "Jelajahi graph",
+    isi: "Lihat bagaimana ide-idemu terhubung",
+  },
+  {
+    href: "/search",
+    icon: "search" as const,
+    judul: "Cari berdasarkan makna",
+    isi: "Temukan catatan tanpa kata yang persis sama",
+  },
+];
+
 export default function DashboardPage() {
   const user = useRequireAuth();
+  const router = useRouter();
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentNotes, setRecentNotes] = useState<RecentNote[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [query, setQuery] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const fetchData = useCallback(async () => {
-    if (!user) return;
-
+  const retry = useCallback(() => {
     setIsLoading(true);
     setErrorMessage("");
-    const token = getToken();
-
-    try {
-      const [statsRes, notesRes] = await Promise.all([
-        apiFetch<DashboardStats>("/dashboard/stats", { token }),
-        apiFetch<{ items: RecentNote[] }>("/dashboard/recent-notes?limit=5", { token }),
-      ]);
-
-      if (statsRes.ok && statsRes.data && notesRes.ok && notesRes.data) {
-        setStats(statsRes.data);
-        setRecentNotes(notesRes.data.items);
-      } else {
-        const errorText = !statsRes.ok
-          ? pesanError(statsRes)
-          : pesanError(notesRes);
-        setErrorMessage(errorText || "Gagal memuat data dashboard.");
-      }
-    } catch {
-      setErrorMessage("Tidak bisa terhubung ke server. Pastikan backend sedang menyala.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user]);
+    setReloadKey((k) => k + 1);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -77,9 +94,7 @@ export default function DashboardPage() {
           setStats(statsRes.data);
           setRecentNotes(notesRes.data.items);
         } else {
-          const errorText = !statsRes.ok
-            ? pesanError(statsRes)
-            : pesanError(notesRes);
+          const errorText = !statsRes.ok ? pesanError(statsRes) : pesanError(notesRes);
           setErrorMessage(errorText || "Gagal memuat data dashboard.");
         }
       })
@@ -89,15 +104,19 @@ export default function DashboardPage() {
         }
       })
       .finally(() => {
-        if (!isCancelled) {
-          setIsLoading(false);
-        }
+        if (!isCancelled) setIsLoading(false);
       });
 
     return () => {
       isCancelled = true;
     };
-  }, [user]);
+  }, [user, reloadKey]);
+
+  function cari(e: FormEvent) {
+    e.preventDefault();
+    const q = query.trim();
+    router.push(q ? `/search?q=${encodeURIComponent(q)}` : "/search");
+  }
 
   if (!user) {
     return (
@@ -107,230 +126,202 @@ export default function DashboardPage() {
     );
   }
 
+  const namaDepan = user.name.trim().split(/\s+/)[0] || user.name;
+
+  const kartuStat = [
+    {
+      href: "/notes",
+      icon: "notes" as const,
+      angka: stats?.totalNotes ?? 0,
+      label: "Catatan",
+      ket: `${stats?.recentActivity ?? 0} aktivitas dalam 7 hari`,
+    },
+    {
+      href: "/graph",
+      icon: "sparkle" as const,
+      angka: stats?.totalConcepts ?? 0,
+      label: "Konsep ditemukan",
+      ket: "Ide utama yang dikenali AI",
+    },
+    {
+      href: "/graph",
+      icon: "graph" as const,
+      angka: stats?.totalRelationships ?? 0,
+      label: "Hubungan",
+      ket: "Tautan antar catatan terkait",
+    },
+  ];
+
   return (
     <AppShell user={user}>
-      <div className="space-y-8">
-        {/* Header Dashboard */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-200">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              Halo, {user.name}
+      <div className="space-y-6">
+        {/* Sapaan + pencarian cepat */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-[28px] font-bold leading-tight tracking-tight text-slate-900 sm:text-[34px]">
+              {sapaan()}, {namaDepan}!
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              Ini ringkasan pengetahuanmu hari ini.
+              Ini ringkasan singkat ruang pengetahuanmu.
             </p>
           </div>
-          <div>
-            <Link
-              href="/notes/new"
-              className="inline-flex min-h-[44px] w-full sm:w-auto items-center justify-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors focus:ring-2 focus:ring-indigo-500"
-            >
-              + Catatan Baru
-            </Link>
-          </div>
+          <form onSubmit={cari} className="relative w-full lg:max-w-sm" role="search">
+            <Icon
+              name="search"
+              className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Cari catatanmu berdasarkan makna…"
+              aria-label="Cari catatan berdasarkan makna"
+              className={`${inputClass} pl-11`}
+            />
+          </form>
         </div>
 
-        {/* Pesan Error */}
         {errorMessage && (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl bg-red-50 p-4 text-sm text-red-700">
-            <span>{errorMessage}</span>
+          <div
+            role="alert"
+            className="flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div>
+              <p className="text-sm font-semibold text-red-700">Data dashboard belum bisa dimuat</p>
+              <p className="mt-0.5 text-sm text-red-700/90">{errorMessage}</p>
+            </div>
             <button
               type="button"
-              onClick={fetchData}
-              className="inline-flex items-center justify-center rounded-lg bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-800 hover:bg-red-200"
+              onClick={retry}
+              className="inline-flex min-h-[40px] items-center justify-center self-start rounded-xl border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 hover:bg-red-50"
             >
               Coba lagi
             </button>
           </div>
         )}
 
-        {/* 1. Empat Kartu Statistik */}
-        <div>
-          <h2 className="text-base font-semibold text-slate-900 mb-3">
-            Statistik Pengetahuan
-          </h2>
-
-          {isLoading ? (
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              {[1, 2, 3, 4].map((i) => (
-                <div
-                  key={i}
-                  className="animate-pulse rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 space-y-2"
+        {/* Kartu statistik */}
+        <div className="grid grid-cols-3 gap-3 sm:gap-5">
+          {isLoading
+            ? [1, 2, 3].map((i) => (
+                <div key={i} className={`${cardClass} animate-pulse space-y-3 p-4 sm:p-6`}>
+                  <div className="h-8 w-12 rounded bg-slate-200" />
+                  <div className="h-4 w-20 rounded bg-slate-100" />
+                </div>
+              ))
+            : kartuStat.map((k) => (
+                <Link
+                  key={k.label}
+                  href={k.href}
+                  className={`${cardClass} group flex items-center gap-4 p-4 transition-shadow hover:shadow-md sm:p-6`}
                 >
-                  <div className="h-4 w-20 rounded bg-slate-200" />
-                  <div className="h-8 w-12 rounded bg-slate-300" />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              {/* Kartu 1: Total Catatan */}
-              <Link
-                href="/notes"
-                className="group rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 hover:ring-indigo-300 hover:shadow-md transition-all"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500 group-hover:text-indigo-600 transition-colors">
-                    Total Catatan
+                  <span className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 sm:inline-flex">
+                    <Icon name={k.icon} className="h-6 w-6" />
                   </span>
-                  <span className="text-xs text-slate-400 group-hover:translate-x-0.5 transition-transform">→</span>
-                </div>
-                <p className="mt-2 text-3xl font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                  {stats?.totalNotes ?? 0}
-                </p>
-              </Link>
-
-              {/* Kartu 2: Konsep */}
-              <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 flex flex-col justify-between">
-                <div>
-                  <span className="text-xs font-medium text-slate-500">
-                    Konsep
-                  </span>
-                  <p className="mt-2 text-3xl font-extrabold text-slate-900">
-                    {stats?.totalConcepts ?? 0}
-                  </p>
-                </div>
-                {(stats?.totalConcepts ?? 0) === 0 && (
-                  <p className="mt-2 text-[11px] text-slate-400">
-                    Terisi otomatis saat fitur AI aktif
-                  </p>
-                )}
-              </div>
-
-              {/* Kartu 3: Relasi */}
-              <Link
-                href="/graph"
-                className="group rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 flex flex-col justify-between hover:ring-indigo-300 hover:shadow-md transition-all"
-              >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-500 group-hover:text-indigo-600 transition-colors">
-                      Relasi
-                    </span>
-                    <span className="text-xs text-slate-400 group-hover:translate-x-0.5 transition-transform">→</span>
+                  <div className="min-w-0">
+                    <p className="text-[28px] font-bold leading-none text-slate-900 sm:text-[34px]">
+                      {k.angka.toLocaleString("id-ID")}
+                    </p>
+                    <p className="mt-1.5 text-sm font-semibold text-slate-900">{k.label}</p>
+                    <p className="mt-0.5 hidden text-xs text-slate-500 sm:block">{k.ket}</p>
                   </div>
-                  <p className="mt-2 text-3xl font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                    {stats?.totalRelationships ?? 0}
-                  </p>
-                </div>
-                {(stats?.totalRelationships ?? 0) === 0 && (
-                  <p className="mt-2 text-[11px] text-slate-400">
-                    Terisi otomatis saat fitur AI aktif
-                  </p>
-                )}
-              </Link>
-
-              {/* Kartu 4: Aktivitas 7 Hari */}
-              <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-                <span className="text-xs font-medium text-slate-500">
-                  Aktivitas 7 Hari
-                </span>
-                <p className="mt-2 text-3xl font-extrabold text-slate-900">
-                  {stats?.recentActivity ?? 0}
-                </p>
-              </div>
-            </div>
-          )}
+                </Link>
+              ))}
         </div>
 
-        {/* 2. Daftar Catatan Terbaru */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-semibold text-slate-900">
-              Catatan Terbaru
-            </h2>
-            <Link
-              href="/notes"
-              className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
-            >
-              Lihat semua &rarr;
-            </Link>
-          </div>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+          {/* Catatan terbaru */}
+          <section className={`${cardClass} overflow-hidden`} aria-labelledby="judul-terbaru">
+            <div className="flex items-center justify-between px-5 py-4 sm:px-6">
+              <h2 id="judul-terbaru" className="text-lg font-bold text-slate-900">
+                Catatan Terbaru
+              </h2>
+              <Link href="/notes" className="text-sm font-semibold text-indigo-700 hover:underline">
+                Lihat semua
+              </Link>
+            </div>
 
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="animate-pulse rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 space-y-2"
-                >
-                  <div className="h-5 w-1/3 rounded bg-slate-200" />
-                  <div className="h-4 w-2/3 rounded bg-slate-100" />
-                </div>
-              ))}
-            </div>
-          ) : recentNotes.length === 0 && !errorMessage ? (
-            /* Keadaan Kosong (Belum ada catatan) */
-            <div className="rounded-2xl bg-white p-8 sm:p-10 text-center ring-1 ring-slate-200">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                  className="h-6 w-6"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
-                  />
-                </svg>
-              </div>
-              <h3 className="mt-3 text-base font-semibold text-slate-900">
-                Belum ada catatan
-              </h3>
-              <p className="mt-1 text-sm text-slate-500 max-w-sm mx-auto">
-                Mulai tulis catatan pertamamu untuk melihat ringkasan pengetahuan di sini.
-              </p>
-              <div className="mt-5">
-                <Link
-                  href="/notes/new"
-                  className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
-                >
-                  + Catatan Baru
-                </Link>
-              </div>
-            </div>
-          ) : (
-            /* Daftar List Catatan Terbaru */
-            <div className="divide-y divide-slate-100 rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 overflow-hidden">
-              {recentNotes.map((note) => (
-                <Link
-                  key={note.id}
-                  href={`/notes/${note.id}`}
-                  className="block p-4 sm:p-5 hover:bg-slate-50 transition-colors group"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                    <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
-                      {note.title}
-                    </h3>
-                    <span className="text-xs text-slate-400 whitespace-nowrap">
-                      {waktuRelatif(note.updatedAt)}
-                    </span>
+            {isLoading ? (
+              <div className="divide-y divide-slate-100 border-t border-slate-100">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="animate-pulse space-y-2 px-5 py-4 sm:px-6">
+                    <div className="h-5 w-1/3 rounded bg-slate-200" />
+                    <div className="h-4 w-2/3 rounded bg-slate-100" />
                   </div>
-
-                  <p className="mt-1.5 text-sm text-slate-600 line-clamp-2">
-                    {note.summary || note.contentPreview || "Tidak ada isi teks."}
-                  </p>
-
-                  {note.tags && note.tags.length > 0 && (
-                    <div className="mt-2.5 flex flex-wrap gap-1.5">
-                      {note.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600"
-                        >
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                ))}
+              </div>
+            ) : recentNotes.length === 0 && !errorMessage ? (
+              <div className="border-t border-slate-100 px-6 py-12 text-center">
+                <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                  <Icon name="edit" className="h-6 w-6" />
+                </span>
+                <h3 className="mt-3 text-base font-semibold text-slate-900">Belum ada catatan</h3>
+                <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
+                  Tulis catatan pertamamu. Nalar akan merangkumnya dan menghubungkannya dengan
+                  ide-idemu yang lain.
+                </p>
+                <Link href="/notes/new" className={`${btnPrimary} mt-5`}>
+                  <Icon name="plus" className="h-5 w-5" />
+                  Tulis catatan pertama
                 </Link>
+              </div>
+            ) : (
+              <ul className="divide-y divide-slate-100 border-t border-slate-100">
+                {recentNotes.map((note) => (
+                  <li key={note.id}>
+                    <Link
+                      href={`/notes/${note.id}`}
+                      className="group flex items-start justify-between gap-4 px-5 py-4 transition-colors hover:bg-slate-50 sm:px-6"
+                    >
+                      <div className="min-w-0">
+                        <h3 className="line-clamp-1 text-[15px] font-semibold text-slate-900 group-hover:text-indigo-700">
+                          {note.title}
+                        </h3>
+                        <p className="mt-0.5 line-clamp-1 text-sm text-slate-500">
+                          {note.summary || note.contentPreview || "Tidak ada isi teks."}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+                        {note.tags && note.tags[0] && (
+                          <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                            {note.tags[0]}
+                          </span>
+                        )}
+                        <span className="whitespace-nowrap text-xs text-slate-500">
+                          {waktuRelatif(note.updatedAt)}
+                        </span>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {/* Aksi cepat */}
+          <section className={`${cardClass} h-fit p-5 sm:p-6`} aria-labelledby="judul-aksi">
+            <h2 id="judul-aksi" className="text-lg font-bold text-slate-900">
+              Aksi Cepat
+            </h2>
+            <ul className="mt-3 space-y-1">
+              {AKSI_CEPAT.map((a) => (
+                <li key={a.href}>
+                  <Link
+                    href={a.href}
+                    className="flex items-center gap-4 rounded-xl p-2 transition-colors hover:bg-slate-50"
+                  >
+                    <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                      <Icon name={a.icon} className="h-5 w-5" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-slate-900">{a.judul}</span>
+                      <span className="block text-xs text-slate-500">{a.isi}</span>
+                    </span>
+                  </Link>
+                </li>
               ))}
-            </div>
-          )}
+            </ul>
+          </section>
         </div>
       </div>
     </AppShell>

@@ -10,9 +10,9 @@ Dokumen ini mencatat bug, kendala, atau hal yang tidak semestinya ditemukan sela
 | Tingkat | Terbuka | Diperbaiki | Dipindah ke Task Lain | Total |
 | :--- | :---: | :---: | :---: | :---: |
 | **P1** (Kritis / Bocor Data / Rusak Total) | 0 | 1 | 0 | 1 |
-| **P2** (Fitur Bermasalah / Membingungkan)   | 0 | 6 | 0 | 6 |
+| **P2** (Fitur Bermasalah / Membingungkan)   | 0 | 7 | 0 | 7 |
 | **P3** (Kosmetik / Tampilan / Bahasa)       | 0 | 4 | 3 | 7 |
-| **Total**                                   | **0** | **11** | **3** | **14** |
+| **Total**                                   | **0** | **12** | **3** | **15** |
 
 ---
 
@@ -139,3 +139,14 @@ Dokumen ini mencatat bug, kendala, atau hal yang tidak semestinya ditemukan sela
 - **Dugaan File Penyebab**: `backend/src/routes/notes.ts`, `backend/src/routes/graph.ts`
 - **Status**: Diperbaiki di Task 5.3; tag dibatasi 30 karakter. Uji router lokal mendapat 422 untuk 31 karakter.
 - **Task Terkait**: Task 5.3
+
+### B-13 Simpul Knowledge Graph Terlalu Kecil dan Halaman Harus Di-scroll
+- **Tingkat**: P2
+- **Langkah Mengulang**:
+  1. Buka halaman `/graph` dengan beberapa catatan.
+  2. Perhatikan ukuran judul simpul, sebaran graph, dan tinggi halaman.
+- **Hasil yang Diharapkan**: Simpul dan judul mudah dibaca, graph tersebar, dan seluruh area kerja pas di tinggi layar.
+- **Hasil yang Terjadi**: Simpul berbentuk kartu kecil dengan judul yang bertumpuk; area graph dapat melewati tinggi layar.
+- **Dugaan File Penyebab**: `frontend/src/components/graph/GraphCanvas.tsx`, `frontend/src/components/graph/GraphContent.tsx`, `frontend/src/components/AppShell.tsx`
+- **Status**: Diperbaiki pada redesign Knowledge Graph: simpul lingkaran dan ukuran berbatas, label selektif, layout ulang, serta tinggi halaman dikunci sesuai viewport.
+- **Task Terkait**: Redesign Knowledge Graph

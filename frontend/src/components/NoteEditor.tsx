@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, pesanError } from "@/lib/api";
 import { getToken } from "@/lib/auth";
+import { Spinner, btnPrimary, btnSecondary } from "@/components/ui";
 
 interface NoteEditorProps {
   initialData?: {
@@ -153,56 +154,62 @@ export function NoteEditor({
 
   const charCount = content.length;
   const isOverLimit = charCount > 50000;
+  const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
+  const labelClass =
+    "block text-xs font-semibold uppercase tracking-wide text-slate-500";
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6" noValidate>
       {errorMessage && (
-        <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">
+        <div
+          role="alert"
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
           {errorMessage}
         </div>
       )}
 
       <div>
-        <label
-          htmlFor="title"
-          className="block text-sm font-semibold text-slate-900"
-        >
-          Judul <span className="text-red-500">*</span>
+        <label htmlFor="title" className={labelClass}>
+          Judul
         </label>
         <input
           id="title"
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Tuliskan judul catatan..."
+          placeholder="Tanpa judul"
           maxLength={255}
           disabled={isSubmitting}
-          className="mt-1.5 w-full min-h-[44px] rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-slate-900 placeholder-slate-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 disabled:opacity-50"
+          aria-invalid={errorMessage === "Judul wajib diisi"}
+          className={`mt-2 w-full border-0 bg-transparent p-0 text-[28px] font-bold leading-tight tracking-tight text-slate-900 placeholder-slate-300 outline-none disabled:opacity-50 ${
+            errorMessage === "Judul wajib diisi"
+              ? "rounded-md ring-2 ring-red-500 ring-offset-4 ring-offset-white"
+              : ""
+          }`}
         />
       </div>
 
       <div>
-        <label
-          htmlFor="tags"
-          className="block text-sm font-semibold text-slate-900"
-        >
+        <label htmlFor="tags" className={labelClass}>
           Tag{" "}
-          <span className="text-xs font-normal text-slate-500">
-            (Maksimal 10 tag. Tekan Enter atau koma untuk menambahkan)
+          <span className="font-normal normal-case tracking-normal text-slate-400">
+            · maksimal 10, tekan Enter atau koma untuk menambah
           </span>
         </label>
-        <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg border border-slate-300 bg-white p-2 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-200">
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           {tags.map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+              className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-700"
             >
-              #{tag}
+              {tag}
               <button
                 type="button"
                 onClick={() => removeTag(tag)}
                 disabled={isSubmitting}
-                className="text-slate-400 hover:text-slate-600 focus:outline-none"
+                aria-label={`Hapus tag ${tag}`}
+                className="text-indigo-400 hover:text-indigo-700"
               >
                 &times;
               </button>
@@ -216,28 +223,23 @@ export function NoteEditor({
               onChange={(e) => setTagInput(e.target.value)}
               onKeyDown={handleTagKeyDown}
               onBlur={handleAddTag}
-              placeholder={tags.length === 0 ? "Contoh: javascript, dasar" : "Tambah tag..."}
+              placeholder={tags.length === 0 ? "+ Tambah tag" : "+ Tambah tag"}
               disabled={isSubmitting}
-              className="min-h-[32px] flex-1 bg-transparent px-2 text-sm text-slate-900 placeholder-slate-400 outline-none"
+              className="min-h-[34px] w-32 rounded-full border border-dashed border-slate-300 bg-transparent px-3 text-sm text-slate-900 placeholder-slate-500 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
             />
           )}
         </div>
       </div>
 
-      <div>
+      <div className="border-t border-slate-100 pt-5">
         <div className="flex items-center justify-between">
-          <label
-            htmlFor="content"
-            className="block text-sm font-semibold text-slate-900"
-          >
-            Isi Catatan <span className="text-red-500">*</span>
+          <label htmlFor="content" className={labelClass}>
+            Isi catatan
           </label>
           <span
-            className={`text-xs ${
-              isOverLimit ? "font-bold text-red-600" : "text-slate-400"
-            }`}
+            className={`text-xs ${isOverLimit ? "font-bold text-red-600" : "text-slate-500"}`}
           >
-            {charCount.toLocaleString("id-ID")} / 50.000
+            {wordCount.toLocaleString("id-ID")} kata · {charCount.toLocaleString("id-ID")} / 50.000
           </span>
         </div>
         <textarea
@@ -247,32 +249,34 @@ export function NoteEditor({
             setContent(e.target.value);
             onContentChange?.(e.target.value);
           }}
-          placeholder="Tuliskan isi catatanmu di sini..."
+          placeholder="Tuliskan isi catatanmu di sini…"
           rows={14}
           disabled={isSubmitting}
-          className={`mt-1.5 w-full min-h-[320px] rounded-lg border bg-white p-3.5 text-slate-900 placeholder-slate-400 outline-none focus:ring-2 disabled:opacity-50 ${
+          className={`mt-3 w-full min-h-[340px] resize-y rounded-xl border bg-white p-4 text-[15px] leading-7 text-slate-900 placeholder-slate-400 outline-none focus:ring-2 disabled:opacity-50 ${
             isOverLimit
               ? "border-red-400 focus:border-red-500 focus:ring-red-200"
-              : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-200"
+              : "border-slate-200 focus:border-indigo-500 focus:ring-indigo-200"
           }`}
         />
       </div>
 
-      <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-2">
+      <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">
         <button
           type="button"
           disabled={isSubmitting}
           onClick={() => router.push("/notes")}
-          className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50"
+          className={btnSecondary}
         >
           Batal
         </button>
-        <button
-          type="submit"
-          disabled={isSubmitting || isOverLimit}
-          className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
-        >
-          {isSubmitting ? "Memproses..." : "Simpan"}
+        <button type="submit" disabled={isSubmitting || isOverLimit} className={btnPrimary}>
+          {isSubmitting ? (
+            <>
+              <Spinner /> Menyimpan…
+            </>
+          ) : (
+            "Simpan"
+          )}
         </button>
       </div>
     </form>

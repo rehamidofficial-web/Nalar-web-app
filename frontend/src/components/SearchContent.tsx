@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRequireAuth } from "@/lib/useRequireAuth";
 import { AppShell } from "@/components/AppShell";
 import { apiFetch, pesanError } from "@/lib/api";
 import { getToken } from "@/lib/auth";
+import { Icon, PageHeader, cardClass, btnPrimary } from "@/components/ui";
 
 interface SearchResultItem {
   noteId: string;
@@ -64,6 +65,37 @@ export function SearchContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  const [tagFilter, setTagFilter] = useState("");
+  const [recent, setRecent] = useState<string[]>([]);
+
+  // Muat riwayat pencarian dari browser (tanpa memblokir render pertama)
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const raw = window.localStorage.getItem("nalar_recent_searches");
+        const parsed: unknown = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(parsed)) {
+          setRecent(parsed.filter((x): x is string => typeof x === "string").slice(0, 5));
+        }
+      } catch {
+        // Riwayat tidak tersedia, abaikan.
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const simpanRiwayat = useCallback((q: string) => {
+    setRecent((prev) => {
+      const next = [q, ...prev.filter((x) => x !== q)].slice(0, 5);
+      try {
+        window.localStorage.setItem("nalar_recent_searches", JSON.stringify(next));
+      } catch {
+        // Abaikan bila penyimpanan penuh atau diblokir.
+      }
+      return next;
+    });
+  }, []);
+
   // Tracking query untuk balapan request (race condition)
   const requestIdRef = useRef(0);
 
@@ -90,6 +122,7 @@ export function SearchContent() {
       setIsLoading(false);
       setHasSearched(true);
       setActiveQuery(q);
+      setTagFilter("");
 
       if (!res.ok) {
         setErrorMessage(pesanError(res));
@@ -99,6 +132,7 @@ export function SearchContent() {
       }
 
       if (res.data) {
+        simpanRiwayat(q);
         setResults(res.data.results || []);
         setMode(res.data.mode);
         setModeMessage(res.message || "");
@@ -110,7 +144,7 @@ export function SearchContent() {
     return () => {
       isCancelled = true;
     };
-  }, [urlQuery]);
+  }, [urlQuery, simpanRiwayat]);
 
   // Submit pencarian (Enter atau Klik Cari)
   function handleSubmit(e?: React.FormEvent) {
@@ -140,240 +174,267 @@ export function SearchContent() {
     );
   }
 
+  const tagCounts = new Map<string, number>();
+  results.forEach((r) => (r.tags ?? []).forEach((t) => tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1)));
+  const tampil = tagFilter ? results.filter((r) => (r.tags ?? []).includes(tagFilter)) : results;
+  const topResult = results[0];
+
+  function labelRelevan(persen: number) {
+    if (persen >= 85) return "Sangat relevan";
+    if (persen >= 65) return "Relevan";
+    return "Cukup relevan";
+  }
+
+  const chipBase =
+    "inline-flex min-h-[40px] items-center rounded-full border px-4 text-sm font-semibold transition-colors";
+
   return (
     <AppShell user={user}>
       <div className="space-y-6">
-        {/* Header Halaman */}
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            Pencarian
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Temukan catatan berdasarkan makna konteks, bukan sekadar kecocokan kata.
-          </p>
-        </div>
+        <PageHeader
+          title="Pencarian"
+          subtitle="Cari berdasarkan makna. Kamu tidak perlu mengetik kata yang persis sama dengan catatanmu."
+        />
 
-        {/* Form Input Pencarian */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
-          <div className="relative flex-1">
+        <form onSubmit={handleSubmit} role="search">
+          <div className="flex items-center gap-2 rounded-2xl bg-white p-2 pl-4 ring-1 ring-slate-200 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus-within:ring-2 focus-within:ring-indigo-500">
+            <Icon name="search" className="h-5 w-5 shrink-0 text-slate-400" />
             <label htmlFor="search-input" className="sr-only">
               Kata kunci pencarian makna
             </label>
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-              <svg
-                className="h-5 w-5 text-slate-400"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-                />
-              </svg>
-            </div>
             <input
               id="search-input"
               type="text"
               value={inputQuery}
               onChange={(e) => setInputQuery(e.target.value)}
-              placeholder="Cari berdasarkan makna, misal: cara kerja async di JavaScript"
-              className="block w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+              placeholder="Contoh: bagaimana sebuah website bicara dengan server"
+              className="min-h-[44px] flex-1 bg-transparent px-1 text-base text-slate-900 placeholder-slate-400 outline-none"
             />
+            <button
+              type="submit"
+              disabled={isLoading || inputQuery.trim().length < 2}
+              className={btnPrimary}
+            >
+              {isLoading ? "Mencari…" : "Cari"}
+            </button>
           </div>
-          <button
-            type="submit"
-            disabled={isLoading || inputQuery.trim().length < 2}
-            className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2"
-          >
-            {isLoading ? "Mencari..." : "Cari"}
-          </button>
         </form>
 
-        {/* Pesan Error */}
         {errorMessage && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {errorMessage}
+          <div
+            role="alert"
+            className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          >
+            <p className="font-semibold">Pencarian belum berhasil</p>
+            <p className="mt-0.5">{errorMessage}</p>
           </div>
         )}
 
-        {/* Spanduk Peringatan Mode Kata Biasa (Cadangan) */}
-        {!isLoading && hasSearched && mode === "kata" && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-            <div className="flex items-center gap-2">
-              <svg
-                className="h-5 w-5 text-amber-600 shrink-0"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              <span>{modeMessage || "Pencarian makna sedang tidak tersedia, menampilkan pencarian kata biasa."}</span>
-            </div>
-          </div>
-        )}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="min-w-0 space-y-5">
+            {!isLoading && hasSearched && mode === "kata" && (
+              <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                <Icon name="alert" className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                <span>
+                  {modeMessage ||
+                    "Pencarian makna sedang tidak tersedia, jadi ditampilkan pencarian kata biasa."}
+                </span>
+              </div>
+            )}
 
-        {/* Loading State (Skeleton) */}
-        {isLoading && (
-          <div className="space-y-4">
-            <p className="text-sm text-slate-500">Mencari catatan...</p>
-            <div className="space-y-3">
-              {[1, 2, 3].map((n) => (
-                <div
-                  key={n}
-                  className="animate-pulse rounded-xl border border-slate-200 bg-white p-5 ring-1 ring-slate-200/60"
-                >
-                  <div className="h-5 w-1/3 rounded bg-slate-200 mb-3" />
-                  <div className="h-4 w-full rounded bg-slate-100 mb-2" />
-                  <div className="h-4 w-2/3 rounded bg-slate-100" />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+            {!isLoading && hasSearched && mode === "makna" && topResult && (
+              <div className="flex items-start gap-3 rounded-2xl bg-indigo-50 p-4 text-sm text-indigo-800">
+                <Icon name="sparkle" className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" />
+                <p>
+                  Nalar menemukan <strong className="font-semibold">{topResult.title}</strong> dari makna
+                  pertanyaanmu, bukan hanya dari kata yang kamu ketik.
+                </p>
+              </div>
+            )}
 
-        {/* Keadaan Awal (Belum Mencari) */}
-        {!isLoading && !hasSearched && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 text-center ring-1 ring-slate-200/60 shadow-sm">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 mb-4">
-              <svg
-                className="h-6 w-6"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-                />
-              </svg>
-            </div>
-            <h2 className="text-base font-semibold text-slate-900 sm:text-lg">
-              Cari Berdasarkan Makna
-            </h2>
-            <p className="mx-auto mt-2 max-w-lg text-sm text-slate-600">
-              Pencarian memahami makna pertanyaan atau ide catatanmu, bukan sekadar mencocokkan kata yang sama persis.
-            </p>
-
-            <div className="mt-6">
-              <p className="text-xs font-medium uppercase tracking-wider text-slate-400 mb-3">
-                Coba contoh pencarian:
-              </p>
-              <div className="flex flex-wrap justify-center gap-2">
-                {CONTOH_PENCARIAN.map((contoh) => (
-                  <button
-                    key={contoh}
-                    type="button"
-                    onClick={() => handlePilihContoh(contoh)}
-                    className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 transition"
-                  >
-                    &ldquo;{contoh}&rdquo;
-                  </button>
+            {isLoading && (
+              <div className="space-y-4" aria-busy="true">
+                <p className="text-sm text-slate-500">Mencari di catatanmu…</p>
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className={`${cardClass} animate-pulse p-5`}>
+                    <div className="mb-3 h-5 w-1/3 rounded bg-slate-200" />
+                    <div className="mb-2 h-4 w-full rounded bg-slate-100" />
+                    <div className="h-4 w-2/3 rounded bg-slate-100" />
+                  </div>
                 ))}
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* Hasil Pencarian */}
-        {!isLoading && hasSearched && (
-          <div>
-            <div className="mb-4">
-              <p className="text-sm font-medium text-slate-700">
-                {results.length} hasil untuk &ldquo;{activeQuery}&rdquo;
-              </p>
-              {koreksi && (
-                <p className="mt-1 text-xs text-slate-500">
-                  Menampilkan hasil untuk &apos;{koreksi.dipakai}&apos; (kamu mengetik &apos;{koreksi.asli}&apos;)
+            {!isLoading && !hasSearched && (
+              <div className={`${cardClass} p-8 text-center`}>
+                <span className="mx-auto mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                  <Icon name="search" className="h-6 w-6" />
+                </span>
+                <h2 className="text-lg font-bold text-slate-900">Cari berdasarkan makna</h2>
+                <p className="mx-auto mt-2 max-w-lg text-sm text-slate-500">
+                  Tulis pertanyaan atau ide seperti kamu bertanya ke teman. Nalar mencocokkan artinya
+                  dengan isi catatanmu.
                 </p>
-              )}
-            </div>
-
-            {results.length === 0 ? (
-              <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center ring-1 ring-slate-200/60 shadow-sm">
-                <p className="text-sm text-slate-600">
-                  Tidak ada catatan yang cukup nyambung dengan pencarianmu. Coba kata lain atau lebih umum.
+                <p className="mb-3 mt-6 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Coba contoh
                 </p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {CONTOH_PENCARIAN.map((contoh) => (
+                    <button
+                      key={contoh}
+                      type="button"
+                      onClick={() => handlePilihContoh(contoh)}
+                      className="inline-flex min-h-[40px] items-center rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
+                    >
+                      &ldquo;{contoh}&rdquo;
+                    </button>
+                  ))}
+                </div>
               </div>
-            ) : (
-              <ul className="space-y-3" role="list">
-                {results.map((item) => {
-                  const persen =
-                    item.similarity !== null
-                      ? Math.round(item.similarity * 100)
-                      : null;
+            )}
 
-                  return (
-                    <li key={item.noteId}>
-                      <Link
-                        href={`/notes/${item.noteId}`}
-                        className="group block rounded-xl border border-slate-200 bg-white p-5 ring-1 ring-slate-200/60 transition hover:border-indigo-300 hover:shadow-sm"
+            {!isLoading && hasSearched && (
+              <div>
+                {tagCounts.size > 0 && (
+                  <div className="mb-4 flex flex-wrap gap-2" aria-label="Saring hasil menurut tag">
+                    <button
+                      type="button"
+                      aria-pressed={!tagFilter}
+                      onClick={() => setTagFilter("")}
+                      className={`${chipBase} ${
+                        !tagFilter
+                          ? "border-indigo-600 bg-indigo-600 text-white"
+                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      Semua ({results.length})
+                    </button>
+                    {Array.from(tagCounts.entries()).map(([tag, n]) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        aria-pressed={tagFilter === tag}
+                        onClick={() => setTagFilter(tagFilter === tag ? "" : tag)}
+                        className={`${chipBase} ${
+                          tagFilter === tag
+                            ? "border-indigo-600 bg-indigo-600 text-white"
+                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                        }`}
                       >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-base font-semibold text-slate-900 group-hover:text-indigo-600 transition">
+                        {tag} ({n})
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <p className="mb-4 text-sm text-slate-500" aria-live="polite">
+                  {tampil.length} catatan ditemukan untuk &ldquo;{activeQuery}&rdquo;, yang paling relevan
+                  di atas
+                </p>
+                {koreksi && (
+                  <p className="-mt-2 mb-4 text-xs text-slate-500">
+                    Menampilkan hasil untuk &lsquo;{koreksi.dipakai}&rsquo; (kamu mengetik &lsquo;
+                    {koreksi.asli}&rsquo;)
+                  </p>
+                )}
+
+                {tampil.length === 0 ? (
+                  <div className={`${cardClass} p-8 text-center`}>
+                    <p className="text-sm text-slate-500">
+                      Catatanmu belum membahas hal ini. Coba tulis dengan kata lain, atau tulis catatan
+                      baru tentangnya.
+                    </p>
+                    <Link href="/notes/new" className={`${btnPrimary} mt-4`}>
+                      Tulis catatan baru
+                    </Link>
+                  </div>
+                ) : (
+                  <ul className="space-y-4">
+                    {tampil.map((item) => {
+                      const persen =
+                        item.similarity !== null ? Math.round(item.similarity * 100) : null;
+                      return (
+                        <li key={item.noteId}>
+                          <Link
+                            href={`/notes/${item.noteId}`}
+                            className={`${cardClass} group block p-5 transition-shadow hover:shadow-md`}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              {item.tags?.[0] ? (
+                                <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                                  {item.tags[0]}
+                                </span>
+                              ) : (
+                                <span />
+                              )}
+                              {persen !== null && (
+                                <div className="flex items-center gap-2 text-xs text-slate-600">
+                                  <span className="hidden sm:inline">{labelRelevan(persen)}</span>
+                                  <span
+                                    className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100"
+                                    role="img"
+                                    aria-label={`Kecocokan ${persen} persen`}
+                                  >
+                                    <span
+                                      className="block h-full rounded-full bg-indigo-600"
+                                      style={{ width: `${Math.min(100, Math.max(0, persen))}%` }}
+                                    />
+                                  </span>
+                                  <span className="w-9 text-right font-semibold">{persen}%</span>
+                                </div>
+                              )}
+                            </div>
+                            <h3 className="mt-3 text-lg font-bold text-slate-900 group-hover:text-indigo-700">
                               {item.title}
                             </h3>
-                            <p className="mt-1 text-sm text-slate-600 line-clamp-2">
+                            <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-slate-500">
                               {item.cuplikan}
                             </p>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
 
-                            {/* Tag */}
-                            {item.tags && item.tags.length > 0 && (
-                              <div className="mt-3 flex flex-wrap gap-1.5">
-                                {item.tags.map((tag) => (
-                                  <span
-                                    key={tag}
-                                    className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
-                                  >
-                                    #{tag}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Skor Kecocokan (hanya untuk mode makna) */}
-                          {persen !== null && (
-                            <div className="shrink-0 sm:text-right">
-                              <span className="text-xs font-semibold text-indigo-600">
-                                Kecocokan {persen}%
-                              </span>
-                              <div className="mt-1 h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
-                                <div
-                                  className="h-full rounded-full bg-indigo-600 transition-all duration-300"
-                                  style={{ width: `${Math.min(100, Math.max(0, persen))}%` }}
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-
-            {/* Catatan Belum Diindeks */}
-            {belumDiindeks > 0 && (
-              <p className="mt-6 text-center text-xs text-slate-400">
-                {belumDiindeks} catatan belum bisa dicari berdasarkan makna karena belum diindeks.
-              </p>
+                {belumDiindeks > 0 && (
+                  <p className="mt-6 text-center text-xs text-slate-500">
+                    {belumDiindeks} catatan belum bisa dicari berdasarkan makna karena belum diindeks.
+                  </p>
+                )}
+              </div>
             )}
           </div>
-        )}
+
+          <aside className="h-fit space-y-5">
+            {recent.length > 0 && (
+              <section className={`${cardClass} overflow-hidden`}>
+                <h2 className="px-5 py-4 text-base font-bold text-slate-900">Pencarian terakhir</h2>
+                <ul className="divide-y divide-slate-100 border-t border-slate-100">
+                  {recent.map((q) => (
+                    <li key={q}>
+                      <button
+                        type="button"
+                        onClick={() => handlePilihContoh(q)}
+                        className="w-full px-5 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50"
+                      >
+                        {q}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            <section className={`${cardClass} p-5`}>
+              <h2 className="text-base font-bold text-slate-900">Tips agar hasil lebih tepat</h2>
+              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-500">
+                <li>Tulis pertanyaan lengkap, seperti kamu bertanya ke teman.</li>
+                <li>Jelaskan idenya, bukan judul yang persis.</li>
+                <li>Pakai tombol tag untuk mempersempit daftar.</li>
+              </ul>
+            </section>
+          </aside>
+        </div>
       </div>
     </AppShell>
   );

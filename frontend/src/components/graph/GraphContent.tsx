@@ -12,6 +12,7 @@ import { GraphNode, GraphEdge, GraphMeta, GraphResponseData } from "@/types/grap
 import { GraphFilters, FilterState } from "@/components/graph/GraphFilters";
 import { NodeDetailPanel } from "@/components/graph/NodeDetailPanel";
 import { GraphList } from "@/components/graph/GraphList";
+import { GRAPH_THEMES, GraphThemeName } from "@/lib/graphTheme";
 
 // Muat GraphCanvas dengan next/dynamic { ssr: false } agar tidak dirender di server
 const GraphCanvas = dynamic(
@@ -19,10 +20,10 @@ const GraphCanvas = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex-1 w-full h-full min-h-[480px] flex items-center justify-center bg-slate-50">
+      <div className="flex-1 w-full h-full min-h-0 flex items-center justify-center bg-[#111318]">
         <div className="text-center">
-          <div className="inline-block w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin mb-2" />
-          <p className="text-sm text-slate-500">Menyiapkan kanvas graph...</p>
+          <div className="inline-block w-8 h-8 border-3 border-indigo-400 border-t-transparent rounded-full animate-spin mb-2" />
+          <p className="text-sm text-slate-300">Menyiapkan kanvas graph...</p>
         </div>
       </div>
     ),
@@ -55,6 +56,31 @@ export function GraphContent() {
     tag: "",
     cariJudul: "",
   });
+  const [themeName, setThemeName] = useState<GraphThemeName>("modern");
+  const theme = GRAPH_THEMES[themeName];
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const savedTheme = window.localStorage.getItem("nalar:graph-theme");
+        if (savedTheme === "modern" || savedTheme === "detective") {
+          setThemeName(savedTheme);
+        }
+      } catch (error) {
+        console.warn("Tema graph tersimpan tidak dapat dibaca.", error);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const handleThemeChange = (nextTheme: GraphThemeName) => {
+    setThemeName(nextTheme);
+    try {
+      window.localStorage.setItem("nalar:graph-theme", nextTheme);
+    } catch (error) {
+      console.warn("Tema graph tidak dapat disimpan di browser.", error);
+    }
+  };
 
   // Data Graph
   const [nodes, setNodes] = useState<GraphNode[]>([]);
@@ -220,42 +246,72 @@ export function GraphContent() {
 
   return (
     <AppShell user={user}>
-      <div className="flex flex-col h-[calc(100vh-4rem)] md:h-screen overflow-hidden bg-white">
+      <div
+        className="flex h-full min-h-0 flex-col overflow-hidden"
+        style={{ backgroundColor: theme.board.background, color: theme.ui.text }}
+      >
         {/* Header Tab dan Info Halaman */}
-        <div className="bg-white px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div
+          className="flex shrink-0 flex-col justify-between gap-3 border-b px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center"
+          style={{ backgroundColor: theme.ui.panel, borderColor: theme.ui.border }}
+        >
           <div>
-            <h1 className="text-lg font-bold text-slate-800">Knowledge Graph</h1>
-            <p className="text-xs text-slate-500">
+            <h1 className="text-lg font-bold" style={{ color: theme.ui.text }}>Knowledge Graph</h1>
+            <p className="text-xs" style={{ color: theme.ui.muted }}>
               Visualisasi hubungan dan keterkaitan antar catatan ide Anda.
             </p>
           </div>
 
           {/* Tab Selector & Legenda */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex rounded-lg border p-0.5" style={{ backgroundColor: theme.ui.control, borderColor: theme.ui.border }} role="group" aria-label="Pilih tema graph">
+              {([
+                ["modern", "Modern"],
+                ["detective", "Detektif"],
+              ] as const).map(([value, label]) => {
+                const isSelected = themeName === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => handleThemeChange(value)}
+                    className="rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors"
+                    style={{
+                      backgroundColor: isSelected ? theme.ui.accent : "transparent",
+                      color: isSelected ? theme.ui.accentText : theme.ui.muted,
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
             {/* Legenda ringkas tema detektif */}
-            <div className="hidden lg:flex items-center gap-3 text-xs text-slate-700 bg-amber-50/80 px-3 py-1.5 rounded-lg border border-amber-200">
+            <div className="hidden items-center gap-3 rounded-lg border px-3 py-1.5 text-xs lg:flex" style={{ color: theme.ui.text, backgroundColor: theme.ui.panelAlt, borderColor: theme.ui.border }}>
               <span className="flex items-center gap-1.5">
-                <span className="w-3.5 h-0.5 bg-rose-600 inline-block shadow-xs" />
+                <span className="inline-block h-0.5 w-3.5" style={{ backgroundColor: theme.thread.similarColor }} />
                 Benang Merah (Makna Mirip)
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-3.5 border-t-2 border-dashed border-sky-500 inline-block" />
+                <span className="inline-block w-3.5 border-t-2 border-dashed" style={{ borderColor: theme.thread.conceptColor }} />
                 Benang Biru (Konsep Sama)
               </span>
             </div>
 
             {/* Tab Navigasi */}
-            <div className="flex rounded-lg bg-slate-100 p-0.5" role="tablist">
+            <div className="flex rounded-lg border p-0.5" style={{ backgroundColor: theme.ui.control, borderColor: theme.ui.border }} role="tablist">
               <button
                 type="button"
                 role="tab"
                 aria-selected={activeTab === "graph"}
                 onClick={() => setActiveTab("graph")}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
-                  activeTab === "graph"
-                    ? "bg-white text-indigo-600 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
+                className="rounded-md px-3 py-1.5 text-xs font-medium transition-all"
+                style={{
+                  backgroundColor: activeTab === "graph" ? theme.ui.accent : "transparent",
+                  color: activeTab === "graph" ? theme.ui.accentText : theme.ui.muted,
+                }}
               >
                 Graph
               </button>
@@ -264,11 +320,11 @@ export function GraphContent() {
                 role="tab"
                 aria-selected={activeTab === "list"}
                 onClick={() => setActiveTab("list")}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
-                  activeTab === "list"
-                    ? "bg-white text-indigo-600 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
+                className="rounded-md px-3 py-1.5 text-xs font-medium transition-all"
+                style={{
+                  backgroundColor: activeTab === "list" ? theme.ui.accent : "transparent",
+                  color: activeTab === "list" ? theme.ui.accentText : theme.ui.muted,
+                }}
               >
                 Daftar
               </button>
@@ -279,6 +335,7 @@ export function GraphContent() {
         {/* Filter Bar */}
         <GraphFilters
           filters={filters}
+          themeName={themeName}
           availableTags={availableTags}
           totalCatatan={meta.totalCatatan}
           jumlahNode={meta.jumlahNode}
@@ -292,14 +349,15 @@ export function GraphContent() {
 
         {/* Banner Mode Fokus */}
         {focusNoteId && (
-          <div className="bg-indigo-50 border-b border-indigo-100 px-4 py-2 flex items-center justify-between text-xs text-indigo-800">
+          <div className="flex items-center justify-between gap-3 border-b px-4 py-2 text-xs" style={{ backgroundColor: theme.ui.selected, borderColor: theme.ui.border, color: theme.ui.text }}>
             <span>
               Mode fokus: Menampilkan catatan pusat dan tetangga terdekatnya.
             </span>
             <button
               type="button"
               onClick={handleResetFocus}
-              className="font-medium underline hover:text-indigo-950"
+              className="shrink-0 font-medium underline"
+              style={{ color: theme.ui.accentText }}
             >
               Kembali ke semua catatan
             </button>
@@ -307,13 +365,13 @@ export function GraphContent() {
         )}
 
         {/* Konten Utama: Error, Loading, Kosong, atau Graph/List */}
-        <div className="flex-1 relative flex flex-col md:flex-row overflow-hidden bg-slate-50">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row" style={{ backgroundColor: theme.board.background }}>
           {isLoading && nodes.length === 0 ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
-                <div className="inline-block w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3" />
-                <p className="text-sm font-medium text-slate-700">Memuat graph...</p>
-                <p className="text-xs text-slate-400 mt-1">Mengambil data relasi catatan Anda</p>
+                <div className="inline-block w-8 h-8 border-3 border-indigo-400 border-t-transparent rounded-full animate-spin mb-3" />
+                <p className="text-sm font-medium" style={{ color: theme.ui.text }}>Memuat graph...</p>
+                <p className="mt-1 text-xs" style={{ color: theme.ui.muted }}>Mengambil data relasi catatan Anda</p>
               </div>
             </div>
           ) : errorMessage ? (
@@ -388,6 +446,7 @@ export function GraphContent() {
                   <GraphCanvas
                     nodes={nodes}
                     edges={edges}
+                    themeName={themeName}
                     selectedNodeId={selectedNode?.id || null}
                     searchQuery={filters.cariJudul}
                     onSelectNode={(node) => setSelectedNode(node)}
@@ -400,6 +459,7 @@ export function GraphContent() {
                       node={selectedNode}
                       edges={edges}
                       allNodes={nodes}
+                      themeName={themeName}
                       isFocusMode={Boolean(focusNoteId)}
                       onClose={() => setSelectedNode(null)}
                       onFocusNode={handleFocusNode}

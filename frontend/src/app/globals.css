@@ -1,26 +1,122 @@
 @import "tailwindcss";
 
+/*
+ * Nalar — design tokens
+ * Terang : primary #4F46E5, secondary #8B5CF6, latar #F8FAFC, permukaan #FFFFFF
+ * Gelap  : primary #818CF8, secondary #A78BFA, latar #0B1020, permukaan #131A2E
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  color-scheme: light;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/*
+ * Mode gelap: warna Tailwind (slate, indigo, dll.) dipetakan ulang ke palet
+ * gelap Nalar, jadi semua kelas yang sudah ada otomatis ikut berubah.
+ */
+:root[data-theme="dark"] {
+  --background: #0b1020;
+  --foreground: #e6eaf5;
+  color-scheme: dark;
+
+  --color-white: #131a2e;
+  --color-slate-50: #0b1020;
+  --color-slate-100: #1a2238;
+  --color-slate-200: #26304a;
+  --color-slate-300: #33405f;
+  --color-slate-400: #77839f;
+  --color-slate-500: #9aa6c0;
+  --color-slate-600: #aeb8cf;
+  --color-slate-700: #c8cfe2;
+  --color-slate-800: #dde2f0;
+  --color-slate-900: #e6eaf5;
+
+  --color-indigo-50: #1c2046;
+  --color-indigo-100: #262b5e;
+  --color-indigo-200: #363c86;
+  --color-indigo-300: #5961d6;
+  --color-indigo-400: #818cf8;
+  --color-indigo-500: #6f78f0;
+  --color-indigo-600: #6366f1;
+  --color-indigo-700: #a5b0fc;
+  --color-indigo-800: #c3cafd;
+  --color-indigo-900: #dfe3ff;
+
+  --color-violet-50: #241a48;
+  --color-violet-100: #2f2260;
+  --color-violet-600: #a78bfa;
+  --color-violet-700: #c4b5fd;
+
+  --color-red-50: #3a1620;
+  --color-red-100: #4a1c28;
+  --color-red-200: #6b2736;
+  --color-red-600: #ef4a5f;
+  --color-red-700: #ff8a98;
+  --color-red-800: #ffb1bb;
+
+  --color-emerald-50: #11302a;
+  --color-emerald-100: #174238;
+  --color-emerald-600: #34d399;
+  --color-emerald-700: #6ee7b7;
+
+  --color-amber-50: #3a2a10;
+  --color-amber-200: #6b4c14;
+  --color-amber-600: #fbbf24;
+  --color-amber-800: #fcd34d;
+}
+
+/* Teks putih tetap putih (tombol berwarna) walau "white" dipetakan ke permukaan gelap */
+.text-white {
+  color: #fff !important;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.005em;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
+}
+
+/* Fokus keyboard yang jelas di semua elemen interaktif */
+:where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* Pelan dan halus untuk pengguna yang mengurangi animasi */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Highlight kecocokan pada hasil pencarian */
+mark.nalar-mark {
+  background: rgb(99 102 241 / 0.14);
+  color: var(--color-indigo-700);
+  border-radius: 4px;
+  padding: 0 3px;
+}
+
+/* Scrollbar tipis */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-slate-300) transparent;
 }
