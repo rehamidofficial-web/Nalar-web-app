@@ -4,30 +4,39 @@ import { useRequireAuth } from "@/lib/useRequireAuth";
 import * as api from "@/lib/api";
 
 const mockReplace = vi.fn();
+const mockRouter = {
+  replace: mockReplace,
+  push: vi.fn(),
+};
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({
-    replace: mockReplace,
-    push: vi.fn(),
-  }),
+  useRouter: () => mockRouter,
 }));
+
+vi.mock("@/lib/auth", () => ({
+  getToken: vi.fn(),
+  clearToken: vi.fn(),
+  saveToken: vi.fn(),
+}));
+
+import { getToken, clearToken } from "@/lib/auth";
 
 describe("lib/useRequireAuth", () => {
   beforeEach(() => {
-    localStorage.clear();
     mockReplace.mockReset();
+    vi.mocked(getToken).mockReset();
+    vi.mocked(clearToken).mockReset();
   });
 
   it("mengalihkan ke /login jika tidak ada token", () => {
-    localStorage.removeItem("nalar_token");
+    vi.mocked(getToken).mockReturnValue(null);
     const { result } = renderHook(() => useRequireAuth());
     expect(mockReplace).toHaveBeenCalledWith("/login");
     expect(result.current).toBeNull();
   });
 
   it("mengembalikan data pengguna jika token ada dan valid", async () => {
-    localStorage.setItem("nalar_token", "valid-token");
-    mockReplace.mockClear();
+    vi.mocked(getToken).mockReturnValue("valid-token");
 
     vi.spyOn(api, "apiFetch").mockResolvedValueOnce({
       ok: true,
@@ -52,7 +61,7 @@ describe("lib/useRequireAuth", () => {
   });
 
   it("menghapus token dan mengalihkan ke /login jika /auth/me gagal", async () => {
-    localStorage.setItem("nalar_token", "expired-token");
+    vi.mocked(getToken).mockReturnValue("expired-token");
 
     vi.spyOn(api, "apiFetch").mockResolvedValueOnce({
       ok: false,
@@ -63,7 +72,7 @@ describe("lib/useRequireAuth", () => {
     const { result } = renderHook(() => useRequireAuth());
 
     await waitFor(() => {
-      expect(localStorage.getItem("nalar_token")).toBeNull();
+      expect(clearToken).toHaveBeenCalled();
       expect(mockReplace).toHaveBeenCalledWith("/login");
       expect(result.current).toBeNull();
     });
