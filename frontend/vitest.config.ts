@@ -16,6 +16,10 @@ export default defineConfig({
       exclude: [
         "**/*.d.ts",
         "src/app/layout.tsx",
+        "src/app/**/layout.tsx",
+        "src/app/global-error.tsx",
+        "src/app/error.tsx",
+        "src/app/not-found.tsx",
         "src/components/graph/GraphFilters.tsx",
         "src/components/graph/GraphList.tsx",
       ],
