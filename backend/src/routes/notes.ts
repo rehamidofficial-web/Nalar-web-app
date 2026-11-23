@@ -1,7 +1,11 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { BATAS_HALAMAN, BATAS_PANJANG_TAG } from "../lib/batasInput.js";
+import {
+  BATAS_HALAMAN,
+  BATAS_PANJANG_TAG,
+  tagsSchema,
+} from "../lib/batasInput.js";
 import { requireAuth } from "../middleware/auth.js";
 import { hapusCacheKamus } from "../lib/koreksiTypo.js";
 import {
@@ -16,19 +20,6 @@ const router = Router();
 router.use(requireAuth);
 
 const uuidSchema = z.string().uuid("ID tidak valid");
-
-// Aturan tag: array string, tiap tag trim & lowercase, 1-30 karakter, maks 10 tag, unik
-const tagsSchema = z
-  .array(
-    z
-      .string()
-      .trim()
-      .toLowerCase()
-      .min(1, "Tag minimal 1 karakter")
-      .max(30, "Tag maksimal 30 karakter")
-  )
-  .max(10, "Maksimal 10 tag")
-  .transform((tags) => [...new Set(tags)]);
 
 const createNoteSchema = z.object({
   title: z
