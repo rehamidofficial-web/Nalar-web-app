@@ -118,10 +118,10 @@ router.get("/me", requireAuth, async (req, res) => {
   });
   if (!user) {
     res
-      .status(404)
+      .status(401)
       .json({
         success: false,
-        message: "Pengguna tidak ditemukan",
+        message: "Token tidak valid atau sudah kedaluwarsa",
         errors: [],
       });
     return;

@@ -11,8 +11,8 @@ Dokumen ini mencatat bug, kendala, atau hal yang tidak semestinya ditemukan sela
 | :--- | :---: | :---: | :---: | :---: |
 | **P1** (Kritis / Bocor Data / Rusak Total) | 0 | 1 | 0 | 1 |
 | **P2** (Fitur Bermasalah / Membingungkan)   | 0 | 7 | 0 | 7 |
-| **P3** (Kosmetik / Tampilan / Bahasa)       | 0 | 4 | 3 | 7 |
-| **Total**                                   | **0** | **12** | **3** | **15** |
+| **P3** (Kosmetik / Tampilan / Bahasa)       | 0 | 5 | 2 | 7 |
+| **Total**                                   | **0** | **13** | **2** | **15** |
 
 ---
 
@@ -107,8 +107,8 @@ Dokumen ini mencatat bug, kendala, atau hal yang tidak semestinya ditemukan sela
 - **Hasil yang Diharapkan**: Respons 401, sama dengan sesi tidak valid.
 - **Hasil yang Terjadi**: Middleware menerima token; `/auth/me` mengembalikan 404 saat pengguna tidak ditemukan.
 - **Dugaan File Penyebab**: `backend/src/middleware/auth.ts`, `backend/src/routes/auth.ts`
-- **Status**: Ditunda ke Task 5.6; tidak mengembalikan data pengguna.
-- **Task Terkait**: Task 5.3 / Task 5.6
+- **Status**: Diperbaiki di Task 5.4; `/auth/me` mengembalikan 401 dengan pesan sesi yang sama seperti token tidak valid.
+- **Task Terkait**: Task 5.3 / Task 5.4
 
 ### B-10 Rute Logout Publik Hanya Memberi Respons Sukses
 - **Tingkat**: P3
