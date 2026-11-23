@@ -131,6 +131,7 @@ export default function GraphCanvas({
   }, [edges, focusId]);
 
   // Gaya tabrakan: dorong kotak catatan yang saling menimpa supaya teks tetap terbaca
+  // eslint-disable-next-line react-hooks/immutability
   const collideForce = useMemo<CollideForce>(() => {
     let list: SimNode[] = [];
     const force: CollideForce = (alpha) => {
@@ -178,6 +179,7 @@ export default function GraphCanvas({
     onApiReady({ zoomIn: () => zoomBy(1.3), zoomOut: () => zoomBy(1 / 1.3), fit });
   }, [onApiReady, zoomBy, fit]);
 
+  // eslint-disable-next-line react-hooks/immutability
   useEffect(() => {
     const g = graphRef.current;
     if (!g) return;
