@@ -92,6 +92,8 @@ export const batasAiMergePerMenit = rateLimit({
 /**
  * Pembatas panggilan AI harian per user
  * Default: 60 panggilan per 24 jam (bisa diatur lewat env RATE_LIMIT_AI_HARIAN_MAX)
+ * Rute pencarian bisa menandai req.lewatiBatasAiHarian = true bila jawabannya sudah ada di cache,
+ * sehingga membuka ulang pencarian yang sama tidak menghabiskan jatah AI.
  */
 export const batasAiHarian = rateLimit({
   windowMs: 24 * 60 * 60 * 1000,
@@ -99,6 +101,8 @@ export const batasAiHarian = rateLimit({
   standardHeaders: "draft-8",
   legacyHeaders: false,
   keyGenerator: getUserIdKey,
+  // Permintaan yang pasti tidak memanggil AI (hasil cache) tidak memakai jatah harian.
+  skip: (req) => req.lewatiBatasAiHarian === true,
   handler: buatHandlerBatas("Batas harian tercapai.", true),
 });
 

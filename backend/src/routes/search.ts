@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -49,6 +49,18 @@ function setCachedEmbedding(userId: string, query: string, embedding: number[]) 
   });
 }
 
+/**
+ * Jika embedding untuk kata kunci ini sudah ada di cache, permintaan tidak akan memanggil AI,
+ * jadi tidak perlu memakai jatah AI harian (mis. membuka ulang atau me-refresh halaman pencarian).
+ */
+function tandaiPencarianDariCache(req: Request, _res: Response, next: NextFunction) {
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  if (q.length >= 2 && req.userId && getCachedEmbedding(req.userId, q)) {
+    req.lewatiBatasAiHarian = true;
+  }
+  next();
+}
+
 // ---------------------------------------------------------
 // Helper perapian cuplikan (maks 160 karakter)
 // ---------------------------------------------------------
@@ -86,7 +98,7 @@ const searchQuerySchema = z.object({
 /**
  * GET /api/v1/search?q=...&limit=10
  */
-router.get("/", batasAiHarian, batasSearchPerMenit, async (req, res) => {
+router.get("/", tandaiPencarianDariCache, batasAiHarian, batasSearchPerMenit, async (req, res) => {
   const waktuMulai = Date.now();
   const userId = req.userId!;
 
@@ -139,26 +151,28 @@ router.get("/", batasAiHarian, batasSearchPerMenit, async (req, res) => {
   const jalankanPencarianKata = async (
     pesanKhusus = "Pencarian makna sedang tidak tersedia, menampilkan pencarian kata biasa."
   ) => {
-    const notes = await prisma.note.findMany({
-      where: {
-        userId,
-        OR: [
-          { title: { contains: teksPencarian, mode: "insensitive" } },
-          { content: { contains: teksPencarian, mode: "insensitive" } },
-        ],
-      },
-      select: {
-        id: true,
-        title: true,
-        content: true,
-        tags: true,
-        updatedAt: true,
-      },
-      orderBy: { updatedAt: "desc" },
-      take: limit,
-    });
-
-    const belumDiindeks = await hitungBelumDiindeks();
+    // Dua query ini tidak saling bergantung, jadi dijalankan bersamaan (hemat satu kali tunggu database)
+    const [notes, belumDiindeks] = await Promise.all([
+      prisma.note.findMany({
+        where: {
+          userId,
+          OR: [
+            { title: { contains: teksPencarian, mode: "insensitive" } },
+            { content: { contains: teksPencarian, mode: "insensitive" } },
+          ],
+        },
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          tags: true,
+          updatedAt: true,
+        },
+        orderBy: { updatedAt: "desc" },
+        take: limit,
+      }),
+      hitungBelumDiindeks(),
+    ]);
     const durasi = Date.now() - waktuMulai;
     console.log(`[Search] mode=kata hasil=${notes.length} durasi=${durasi}ms`);
 
@@ -183,7 +197,7 @@ router.get("/", batasAiHarian, batasSearchPerMenit, async (req, res) => {
   };
 
   // 5. Coba pencarian makna dengan embedding
-  let embedding = getCachedEmbedding(userId, teksPencarian);
+  let embedding = getCachedEmbedding(userId, teksPencarian) ?? getCachedEmbedding(userId, q);
   let cacheHit = false;
 
   if (embedding) {
@@ -193,6 +207,9 @@ router.get("/", batasAiHarian, batasSearchPerMenit, async (req, res) => {
       const embRes = await createEmbedding(teksPencarian);
       embedding = embRes.embedding;
       setCachedEmbedding(userId, teksPencarian, embedding);
+      // Simpan juga dengan kata kunci asli yang diketik, supaya pencarian yang sama
+      // (mis. halaman di-refresh) langsung kena cache dan tidak memakai jatah AI harian.
+      if (q !== teksPencarian) setCachedEmbedding(userId, q, embedding);
     } catch (err: any) {
       // Periksa apakah error karena kuota habis atau service gangguan
       const status =
@@ -231,20 +248,24 @@ router.get("/", batasAiHarian, batasSearchPerMenit, async (req, res) => {
 
     const noteIds = hasilMirip.map((h) => h.noteId);
 
-    // Ambil detail catatan (dobel cek kepemilikan userId)
-    const catatanDetail = await prisma.note.findMany({
-      where: {
-        id: { in: noteIds },
-        userId,
-      },
-      select: {
-        id: true,
-        title: true,
-        content: true,
-        tags: true,
-        updatedAt: true,
-      },
-    });
+    // Ambil detail catatan (dobel cek kepemilikan userId) bersamaan dengan hitungan catatan
+    // yang belum diindeks (dua query ini tidak saling bergantung).
+    const [catatanDetail, belumDiindeks] = await Promise.all([
+      prisma.note.findMany({
+        where: {
+          id: { in: noteIds },
+          userId,
+        },
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          tags: true,
+          updatedAt: true,
+        },
+      }),
+      hitungBelumDiindeks(),
+    ]);
 
     const detailMap = new Map(catatanDetail.map((c) => [c.id, c]));
 
@@ -263,7 +284,6 @@ router.get("/", batasAiHarian, batasSearchPerMenit, async (req, res) => {
         };
       });
 
-    const belumDiindeks = await hitungBelumDiindeks();
     const durasi = Date.now() - waktuMulai;
     console.log(
       `[Search] mode=makna hasil=${results.length} cache=${cacheHit ? "hit" : "miss"} durasi=${durasi}ms`

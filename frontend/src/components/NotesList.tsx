@@ -191,6 +191,8 @@ export function NotesList() {
     }
   }, [user, paramPage, paramSearch, paramTag, paramSort]);
 
+  // Daftar tag cukup diambil sekali saat halaman dibuka (dan setelah hapus catatan),
+  // bukan setiap pindah halaman, ganti urutan, atau mengetik pencarian.
   useEffect(() => {
     if (!user) return;
 
@@ -204,6 +206,17 @@ export function NotesList() {
         }
       });
     }
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let isCancelled = false;
+    const token = getToken();
 
     const currentRequestId = ++requestIdRef.current;
     const query = new URLSearchParams({

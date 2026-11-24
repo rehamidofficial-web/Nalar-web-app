@@ -12,6 +12,10 @@ interface CacheKamus {
 }
 
 const KAMUS_TTL_MS = 10 * 60 * 1000; // 10 menit
+
+// Kamus hanya dibangun dari catatan terbaru supaya tetap cepat dan hemat data
+// walau pengguna punya ribuan catatan (kamus penuh bisa berukuran beberapa MB).
+export const BATAS_CATATAN_KAMUS = 500;
 const cacheKamusUser = new Map<string, CacheKamus>();
 
 // Daftar kata umum (stop words) bahasa Indonesia & Inggris sederhana yang dilewati
@@ -168,7 +172,7 @@ export function hapusCacheKamus(userId: string): void {
 }
 
 /**
- * Mengambil atau membangun kamus kata dari seluruh catatan pengguna.
+ * Mengambil atau membangun kamus kata dari catatan terbaru pengguna (maks. BATAS_CATATAN_KAMUS).
  * Kriteria kata:
  * - Huruf kecil, panjang >= 4
  * - Berasal dari judul, tag, nama konsep, dan kata dalam isi catatan (muncul >= 2x).
@@ -186,6 +190,8 @@ export async function ambilKamus(userId: string): Promise<Map<string, number>> {
     // 1. Ambil catatan milik user: judul, tags, dan content
     const notes = await prisma.note.findMany({
       where: { userId },
+      orderBy: { updatedAt: "desc" },
+      take: BATAS_CATATAN_KAMUS,
       select: { title: true, tags: true, content: true },
     });
 
