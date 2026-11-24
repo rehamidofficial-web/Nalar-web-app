@@ -540,7 +540,7 @@ export function AssistantContent() {
                 onChange={(e) => setInputQuestion(e.target.value)}
                 onKeyDown={handleKeyDown}
                 disabled={isSending}
-                className="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent py-3 text-[15px] text-slate-900 placeholder-slate-400 outline-none disabled:opacity-60"
+                className="max-h-32 min-h-[44px] min-w-0 flex-1 resize-none bg-transparent py-3 text-base text-slate-900 placeholder-slate-400 outline-none disabled:opacity-60 sm:text-[15px]"
               />
               <button
                 type="button"

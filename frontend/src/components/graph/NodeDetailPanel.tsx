@@ -10,9 +10,11 @@ interface NodeDetailPanelProps {
   edges: GraphEdge[];
   allNodes: GraphNode[];
   onSelectId: (nodeId: string) => void;
+  /** Hanya dipakai di layar kecil: tombol untuk kembali ke graph di atas. */
+  onBackToGraph?: () => void;
 }
 
-export function NodeDetailPanel({ node, edges, allNodes, onSelectId }: NodeDetailPanelProps) {
+export function NodeDetailPanel({ node, edges, allNodes, onSelectId, onBackToGraph }: NodeDetailPanelProps) {
   const nodeMap = useMemo(() => {
     const map = new Map<string, GraphNode>();
     allNodes.forEach((n) => map.set(n.id, n));
@@ -108,6 +110,11 @@ export function NodeDetailPanel({ node, edges, allNodes, onSelectId }: NodeDetai
         >
           Tanya AI tentang ini
         </Link>
+        {onBackToGraph && (
+          <button type="button" onClick={onBackToGraph} className={`${btnSecondary} w-full lg:hidden`}>
+            Kembali ke graph
+          </button>
+        )}
       </div>
     </aside>
   );

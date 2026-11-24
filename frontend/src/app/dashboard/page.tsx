@@ -278,16 +278,16 @@ export default function DashboardPage() {
                       className="group flex items-start justify-between gap-4 px-5 py-4 transition-colors hover:bg-slate-50 sm:px-6"
                     >
                       <div className="min-w-0">
-                        <h3 className="line-clamp-1 text-[15px] font-semibold text-slate-900 group-hover:text-indigo-700">
+                        <h3 className="line-clamp-2 break-words text-[15px] font-semibold text-slate-900 group-hover:text-indigo-700 sm:line-clamp-1">
                           {note.title}
                         </h3>
-                        <p className="mt-0.5 line-clamp-1 text-sm text-slate-500">
+                        <p className="mt-0.5 line-clamp-1 break-words text-sm text-slate-500">
                           {note.summary || note.contentPreview || "Tidak ada isi teks."}
                         </p>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-3">
                         {note.tags && note.tags[0] && (
-                          <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                          <span className="max-w-[7.5rem] truncate rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 sm:max-w-[10rem]">
                             {note.tags[0]}
                           </span>
                         )}
@@ -303,23 +303,31 @@ export default function DashboardPage() {
           </section>
 
           {/* Aksi cepat */}
-          <section className={`${cardClass} h-fit p-5 sm:p-6`} aria-labelledby="judul-aksi">
-            <h2 id="judul-aksi" className="text-lg font-bold text-slate-900">
+          {/* Di HP: dua tombol sejajar seperti desain (catatan baru dan cari sudah ada di
+              tombol + dan menu bawah). Di layar lebar: kartu daftar lengkap. */}
+          <section
+            className="h-fit lg:rounded-2xl lg:bg-white lg:p-6 lg:shadow-[0_1px_2px_rgba(15,23,42,0.04)] lg:ring-1 lg:ring-slate-200"
+            aria-labelledby="judul-aksi"
+          >
+            <h2 id="judul-aksi" className="sr-only text-lg font-bold text-slate-900 lg:not-sr-only">
               Aksi Cepat
             </h2>
-            <ul className="mt-3 space-y-1">
+            <ul className="grid grid-cols-2 gap-3 lg:mt-3 lg:block lg:space-y-1">
               {AKSI_CEPAT.map((a) => (
-                <li key={a.href}>
+                <li
+                  key={a.href}
+                  className={a.href === "/notes/new" || a.href === "/search" ? "hidden lg:block" : ""}
+                >
                   <Link
                     href={a.href}
-                    className="flex items-center gap-4 rounded-xl p-2 transition-colors hover:bg-slate-50"
+                    className="flex min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-white px-3 text-center ring-1 ring-slate-200 transition-colors hover:bg-slate-50 lg:justify-start lg:gap-4 lg:rounded-xl lg:p-2 lg:text-left lg:ring-0"
                   >
-                    <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                    <span className="inline-flex shrink-0 items-center justify-center text-indigo-600 lg:h-11 lg:w-11 lg:rounded-xl lg:bg-indigo-50">
                       <Icon name={a.icon} className="h-5 w-5" />
                     </span>
                     <span className="min-w-0">
                       <span className="block text-sm font-semibold text-slate-900">{a.judul}</span>
-                      <span className="block text-xs text-slate-500">{a.isi}</span>
+                      <span className="hidden text-xs text-slate-500 lg:block">{a.isi}</span>
                     </span>
                   </Link>
                 </li>

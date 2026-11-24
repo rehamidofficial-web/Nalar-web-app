@@ -186,7 +186,7 @@ export function SearchContent() {
   }
 
   const chipBase =
-    "inline-flex min-h-[40px] items-center rounded-full border px-4 text-sm font-semibold transition-colors";
+    "inline-flex min-h-[40px] shrink-0 items-center whitespace-nowrap rounded-full border px-4 text-sm font-semibold transition-colors";
 
   return (
     <AppShell user={user}>
@@ -208,12 +208,12 @@ export function SearchContent() {
               value={inputQuery}
               onChange={(e) => setInputQuery(e.target.value)}
               placeholder="Contoh: bagaimana sebuah website bicara dengan server"
-              className="min-h-[44px] flex-1 bg-transparent px-1 text-base text-slate-900 placeholder-slate-400 outline-none"
+              className="min-h-[44px] min-w-0 flex-1 bg-transparent px-1 text-base text-slate-900 placeholder-slate-400 outline-none"
             />
             <button
               type="submit"
               disabled={isLoading || inputQuery.trim().length < 2}
-              className={btnPrimary}
+              className={`${btnPrimary} shrink-0 !px-4 sm:!px-5`}
             >
               {isLoading ? "Mencari…" : "Cari"}
             </button>
@@ -284,7 +284,7 @@ export function SearchContent() {
                       key={contoh}
                       type="button"
                       onClick={() => handlePilihContoh(contoh)}
-                      className="inline-flex min-h-[40px] items-center rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
+                      className="inline-flex min-h-[40px] max-w-full items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-left text-sm font-medium text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
                     >
                       &ldquo;{contoh}&rdquo;
                     </button>
@@ -296,7 +296,10 @@ export function SearchContent() {
             {!isLoading && hasSearched && (
               <div>
                 {tagCounts.size > 0 && (
-                  <div className="mb-4 flex flex-wrap gap-2" aria-label="Saring hasil menurut tag">
+                  <div
+                    className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0"
+                    aria-label="Saring hasil menurut tag"
+                  >
                     <button
                       type="button"
                       aria-pressed={!tagFilter}
@@ -361,7 +364,7 @@ export function SearchContent() {
                           >
                             <div className="flex items-center justify-between gap-3">
                               {item.tags?.[0] ? (
-                                <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                                <span className="max-w-[50%] truncate rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
                                   {item.tags[0]}
                                 </span>
                               ) : (
@@ -384,10 +387,10 @@ export function SearchContent() {
                                 </div>
                               )}
                             </div>
-                            <h3 className="mt-3 text-lg font-bold text-slate-900 group-hover:text-indigo-700">
+                            <h3 className="mt-3 break-words text-lg font-bold text-slate-900 group-hover:text-indigo-700">
                               {item.title}
                             </h3>
-                            <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-slate-500">
+                            <p className="mt-1.5 line-clamp-2 break-words text-sm leading-relaxed text-slate-500">
                               {item.cuplikan}
                             </p>
                           </Link>
@@ -416,7 +419,7 @@ export function SearchContent() {
                       <button
                         type="button"
                         onClick={() => handlePilihContoh(q)}
-                        className="w-full px-5 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50"
+                        className="min-h-[44px] w-full break-words px-5 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50"
                       >
                         {q}
                       </button>

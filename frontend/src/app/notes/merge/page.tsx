@@ -300,7 +300,7 @@ function MergePageContent() {
                       setHasEdited(true);
                     }}
                     placeholder="Judul catatan baru"
-                    className="block w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    className="block w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-base text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 sm:text-sm"
                   />
                 </div>
 
@@ -341,7 +341,7 @@ function MergePageContent() {
                           }
                         }}
                         placeholder={tags.length === 0 ? "Ketik tag lalu tekan Enter" : "+ tag"}
-                        className="flex-1 min-w-[80px] border-none p-1 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                        className="flex-1 min-w-[80px] border-none p-1 text-base text-slate-800 placeholder:text-slate-400 focus:outline-none sm:text-xs"
                       />
                     )}
                   </div>
@@ -363,7 +363,7 @@ function MergePageContent() {
                       setHasEdited(true);
                     }}
                     placeholder="Isi catatan gabungan..."
-                    className="block w-full rounded-xl border border-slate-300 p-3.5 text-sm text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    className="block w-full rounded-xl border border-slate-300 p-3.5 text-base text-slate-900 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 sm:text-sm"
                   />
                   <div className="mt-1 flex justify-between text-[11px] text-slate-400">
                     <span>Mendukung format Markdown</span>

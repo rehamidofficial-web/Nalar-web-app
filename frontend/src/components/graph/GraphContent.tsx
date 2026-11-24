@@ -52,6 +52,8 @@ export function GraphContent() {
 
   const requestIdRef = useRef(0);
   const canvasApiRef = useRef<GraphCanvasApi | null>(null);
+  const graphBoxRef = useRef<HTMLElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const handleApiReady = useCallback((api: GraphCanvasApi) => {
     canvasApiRef.current = api;
   }, []);
@@ -112,6 +114,21 @@ export function GraphContent() {
     return () => clearTimeout(timer);
   }, [fetchData]);
 
+  // Di layar kecil panel detail ada di bawah graph, jadi gulir ke sana saat titik diketuk
+  const handleCanvasSelect = (node: GraphNode) => {
+    setSelectedNode(node);
+    const kecil = typeof window !== "undefined" && window.matchMedia?.("(max-width: 1023px)")?.matches;
+    if (kecil) {
+      requestAnimationFrame(() => {
+        panelRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+      });
+    }
+  };
+
+  const handleBackToGraph = () => {
+    graphBoxRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  };
+
   const handleSelectId = (id: string) => {
     const found = nodes.find((n) => n.id === id);
     if (found) setSelectedNode(found);
@@ -165,7 +182,11 @@ export function GraphContent() {
         </div>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <section className={`${cardClass} overflow-hidden`} aria-label="Graph catatan">
+          <section
+            ref={graphBoxRef}
+            className={`${cardClass} scroll-mt-20 overflow-hidden lg:scroll-mt-0`}
+            aria-label="Graph catatan"
+          >
             {/* Toolbar */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-3.5">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
@@ -178,7 +199,7 @@ export function GraphContent() {
                 </span>
                 {meta.terpotong && <span className="text-amber-600">Sebagian catatan tidak ditampilkan</span>}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {focusNoteId && (
                   <button type="button" onClick={handleResetFocus} className={`${btnSecondary} !min-h-[44px]`}>
                     Semua catatan
@@ -199,12 +220,12 @@ export function GraphContent() {
               </div>
             </div>
 
-            <div className="h-[520px] bg-[#0b1020]">
+            <div className="h-[60dvh] max-h-[560px] min-h-[360px] bg-[#0b1020] lg:h-[520px]">
               <GraphCanvas
                 nodes={nodes}
                 edges={edges}
                 selectedNodeId={selectedNode?.id || null}
-                onSelectNode={(node) => setSelectedNode(node)}
+                onSelectNode={handleCanvasSelect}
                 onBackgroundClick={() => setSelectedNode(null)}
                 onZoomChange={setZoomPercent}
                 onApiReady={handleApiReady}
@@ -215,9 +236,20 @@ export function GraphContent() {
               Geser untuk memindahkan graph. Pakai + dan – untuk zoom. Klik sebuah titik untuk melihat
               hubungannya.
             </p>
+            <p className="border-t border-slate-200 px-5 py-3 text-xs text-slate-500 lg:hidden">
+              Di HP, sentuh area graph untuk menggeser graph. Untuk menggulir halaman, sentuh di luar graph.
+            </p>
           </section>
 
-          <NodeDetailPanel node={selectedNode} edges={edges} allNodes={nodes} onSelectId={handleSelectId} />
+          <div ref={panelRef} className="scroll-mt-20 lg:scroll-mt-0">
+            <NodeDetailPanel
+              node={selectedNode}
+              edges={edges}
+              allNodes={nodes}
+              onSelectId={handleSelectId}
+              onBackToGraph={handleBackToGraph}
+            />
+          </div>
         </div>
       )}
     </AppShell>

@@ -265,11 +265,19 @@ export function NotesList() {
       }
     }
 
+    // Menu memakai posisi tetap di layar, jadi tutup saat halaman digulir (penting di HP)
+    const awalGulir = window.scrollY;
+    function handleScroll() {
+      if (Math.abs(window.scrollY - awalGulir) > 8) setOpenMenuId(null);
+    }
+
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", handleScroll);
     };
   }, [openMenuId]);
 
@@ -413,7 +421,7 @@ export function NotesList() {
   }
 
   const chipBase =
-    "inline-flex min-h-[40px] items-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition-colors";
+    "inline-flex min-h-[40px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-sm font-semibold transition-colors";
   const chipOn = "border-indigo-600 bg-indigo-600 text-white";
   const chipOff = "border-slate-200 bg-white text-slate-700 hover:bg-slate-50";
 
@@ -455,7 +463,7 @@ export function NotesList() {
               <button
                 type="button"
                 onClick={() => updateQueryParams({ tag: tagUtama, page: 1 })}
-                className="pointer-events-auto rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                className="pointer-events-auto max-w-[55%] truncate rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
               >
                 {tagUtama}
               </button>
@@ -464,10 +472,10 @@ export function NotesList() {
                 Tanpa tag
               </span>
             )}
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-500">Diubah {formatDate(note.updatedAt)}</span>
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="whitespace-nowrap text-xs text-slate-500">Diubah {formatDate(note.updatedAt)}</span>
               {isSelectionMode && (
-                <label className="pointer-events-auto inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg hover:bg-indigo-50">
+                <label className="pointer-events-auto inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg hover:bg-indigo-50 sm:h-9 sm:w-9">
                   <input
                     type="checkbox"
                     checked={isSelected}
@@ -485,17 +493,17 @@ export function NotesList() {
                 aria-expanded={openMenuId === note.id}
                 aria-controls={openMenuId === note.id ? `note-menu-${note.id}` : undefined}
                 onClick={(event) => toggleNoteMenu(note.id, event.currentTarget)}
-                className="pointer-events-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                className="pointer-events-auto inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 sm:h-9 sm:w-9"
               >
                 <Icon name="more" className="h-5 w-5" />
               </button>
             </div>
           </div>
 
-          <h2 className="mt-3 line-clamp-2 text-lg font-bold leading-snug text-slate-900">
+          <h2 className="mt-3 line-clamp-2 break-words text-lg font-bold leading-snug text-slate-900">
             {note.title}
           </h2>
-          <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-500">
+          <p className="mt-2 line-clamp-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-500">
             {note.summary || note.contentPreview || "Tidak ada isi teks."}
           </p>
 
@@ -506,7 +514,7 @@ export function NotesList() {
                   key={tag}
                   type="button"
                   onClick={() => updateQueryParams({ tag, page: 1 })}
-                  className="pointer-events-auto rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
+                  className="pointer-events-auto max-w-full truncate rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
                 >
                   #{tag}
                 </button>
@@ -556,7 +564,7 @@ export function NotesList() {
             <div
               role="group"
               aria-label="Urutkan catatan"
-              className="inline-flex rounded-xl border border-slate-200 bg-white p-1"
+              className="flex w-full rounded-xl border border-slate-200 bg-white p-1 sm:inline-flex sm:w-auto"
             >
               {(
                 [
@@ -570,7 +578,7 @@ export function NotesList() {
                   type="button"
                   aria-pressed={paramSort === value}
                   onClick={() => updateQueryParams({ sort: value, page: 1 })}
-                  className={`min-h-[36px] rounded-lg px-3.5 text-sm font-semibold transition-colors ${
+                  className={`min-h-[44px] flex-1 rounded-lg px-3.5 text-sm font-semibold transition-colors sm:min-h-[36px] sm:flex-none ${
                     paramSort === value
                       ? "bg-indigo-50 text-indigo-700"
                       : "text-slate-600 hover:text-slate-900"
@@ -584,7 +592,7 @@ export function NotesList() {
             <div
               role="group"
               aria-label="Tampilan daftar"
-              className="inline-flex rounded-xl border border-slate-200 bg-white p-1"
+              className="hidden rounded-xl border border-slate-200 bg-white p-1 sm:inline-flex"
             >
               {(
                 [
@@ -613,7 +621,10 @@ export function NotesList() {
 
         {/* Chip tag */}
         {availableTags.length > 0 && (
-          <div className="mt-4 flex flex-wrap items-center gap-2" aria-label="Filter tag">
+          <div
+            className="-mx-4 mt-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0"
+            aria-label="Filter tag"
+          >
             <button
               type="button"
               aria-pressed={!paramTag}
@@ -669,7 +680,7 @@ export function NotesList() {
 
         {/* Bilah gabung catatan */}
         {isSelectionMode && (
-          <div className="sticky top-20 z-20 mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
+          <div className="sticky top-[4.5rem] z-20 mt-5 flex flex-wrap lg:top-4 items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
             <div className="flex items-center gap-2 text-sm font-semibold text-indigo-900">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs text-white">
                 {selectedNoteIds.length}

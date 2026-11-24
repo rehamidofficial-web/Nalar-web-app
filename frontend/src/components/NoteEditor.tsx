@@ -225,7 +225,7 @@ export function NoteEditor({
               onBlur={handleAddTag}
               placeholder={tags.length === 0 ? "+ Tambah tag" : "+ Tambah tag"}
               disabled={isSubmitting}
-              className="min-h-[34px] w-32 rounded-full border border-dashed border-slate-300 bg-transparent px-3 text-sm text-slate-900 placeholder-slate-500 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+              className="min-h-[34px] w-32 rounded-full border border-dashed border-slate-300 bg-transparent px-3 text-base text-slate-900 placeholder-slate-500 sm:text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
             />
           )}
         </div>
@@ -252,7 +252,7 @@ export function NoteEditor({
           placeholder="Tuliskan isi catatanmu di sini…"
           rows={14}
           disabled={isSubmitting}
-          className={`mt-3 w-full min-h-[340px] resize-y rounded-xl border bg-white p-4 text-[15px] leading-7 text-slate-900 placeholder-slate-400 outline-none focus:ring-2 disabled:opacity-50 ${
+          className={`mt-3 w-full min-h-[340px] resize-y rounded-xl border bg-white p-4 text-base leading-7 text-slate-900 placeholder-slate-400 outline-none focus:ring-2 disabled:opacity-50 sm:text-[15px] ${
             isOverLimit
               ? "border-red-400 focus:border-red-500 focus:ring-red-200"
               : "border-slate-200 focus:border-indigo-500 focus:ring-indigo-200"

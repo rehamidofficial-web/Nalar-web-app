@@ -172,7 +172,7 @@ export function AppShell({ user, children }: AppShellProps) {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       {/* Bilah atas khusus layar kecil */}
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 lg:hidden">
+      <header className="sticky top-0 z-30 flex h-[calc(4rem_+_env(safe-area-inset-top))] items-center justify-between border-b border-slate-200 bg-white px-4 pt-[env(safe-area-inset-top)] lg:hidden">
         <Link href="/dashboard" className="flex items-center gap-2.5" aria-label="Nalar, ke Dashboard">
           <NalarMark size={32} />
           <span className="text-xl font-bold tracking-tight text-slate-900">Nalar</span>
@@ -198,7 +198,7 @@ export function AppShell({ user, children }: AppShellProps) {
           onClick={() => setMenuOpen(false)}
         >
           <div
-            className="w-full rounded-t-3xl bg-white p-5 pb-8 shadow-xl"
+            className="w-full rounded-t-3xl bg-white p-5 pb-[calc(2rem_+_env(safe-area-inset-bottom))] shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3">
@@ -235,7 +235,7 @@ export function AppShell({ user, children }: AppShellProps) {
           {renderSidebar()}
         </aside>
 
-        <main className="min-w-0 flex-1 pb-24 lg:pb-0 lg:pl-[272px]">
+        <main className="min-w-0 flex-1 pb-[calc(6rem_+_env(safe-area-inset-bottom))] lg:pb-0 lg:pl-[272px]">
           <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-9">{children}</div>
         </main>
       </div>
@@ -245,7 +245,7 @@ export function AppShell({ user, children }: AppShellProps) {
         <Link
           href="/notes/new"
           aria-label="Catatan baru"
-          className="fixed bottom-24 right-5 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-[0_8px_24px_rgba(79,70,229,0.4)] transition-colors hover:bg-indigo-700 lg:hidden"
+          className="fixed bottom-[calc(6rem_+_env(safe-area-inset-bottom))] right-5 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-[0_8px_24px_rgba(79,70,229,0.4)] transition-colors hover:bg-indigo-700 lg:hidden"
         >
           <Icon name="plus" className="h-7 w-7" />
         </Link>
@@ -254,7 +254,7 @@ export function AppShell({ user, children }: AppShellProps) {
       {/* Navigasi bawah (layar kecil) */}
       <nav
         aria-label="Navigasi bawah"
-        className="fixed inset-x-0 bottom-0 z-40 flex h-[4.25rem] items-stretch border-t border-slate-200 bg-white lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 flex h-[calc(4.25rem_+_env(safe-area-inset-bottom))] items-stretch border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
         {MENU.filter((m) => m.inBottomBar).map((item) => {
           const active = item.match(pathname);
