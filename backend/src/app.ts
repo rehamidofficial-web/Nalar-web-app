@@ -10,7 +10,14 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { batasUmum } from "./middleware/rateLimit.js";
 import express from "express";
 import cors from "cors";
-import helmet from "helmet";
+import helmetImport from "helmet";
+
+// Helmet diekspor sebagai fungsi (CJS) atau { default } (ESM) tergantung cara hosting memeriksa
+// TypeScript. Baris ini menangani keduanya agar tidak error saat build di Vercel.
+type HelmetFn = (options?: Record<string, unknown>) => express.RequestHandler;
+const helmetModule = helmetImport as unknown as HelmetFn | { default: HelmetFn };
+const helmet: HelmetFn =
+  typeof helmetModule === "function" ? helmetModule : helmetModule.default;
 
 export const app = express();
 
