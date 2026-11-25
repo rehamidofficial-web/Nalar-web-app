@@ -15,6 +15,9 @@ import helmet from "helmet";
 export const app = express();
 
 app.disable("x-powered-by");
+// Di belakang proxy hosting (Vercel/Render): percayai 1 lapis proxy agar IP asli pengguna terbaca
+// (dipakai pembatas laju). Tanpa ini semua pengguna dianggap satu IP.
+app.set("trust proxy", 1);
 const helmetOptions =
   process.env.NODE_ENV === "production"
     ? {}
@@ -61,3 +64,6 @@ app.get("/api/v1/health/db", async (_req, res) => {
 
 app.use(notFoundHandler);
 app.use(errorHandler);
+
+// Default export dibutuhkan hosting serverless (Vercel). Export bernama `app` tetap dipakai tes.
+export default app;
