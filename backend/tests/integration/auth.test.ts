@@ -1,12 +1,15 @@
 import "../helpers/mockAi.js";
 import "../helpers/mockBackgroundEmbedding.js";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import jwt from "jsonwebtoken";
+import { ipKeyGenerator } from "express-rate-limit";
 import { prisma } from "../../src/lib/prisma.js";
+import { batasAuth } from "../../src/middleware/rateLimit.js";
 import { createTestClient } from "../helpers/client.js";
 import {
   cleanupStaleTestAccounts,
   cleanupTestAccounts,
+  createTestAccount,
   createTestCredentials,
 } from "../helpers/testData.js";
 
@@ -15,6 +18,12 @@ const emails = new Set<string>();
 
 beforeAll(async () => {
   await cleanupStaleTestAccounts();
+});
+
+beforeEach(async () => {
+  await batasAuth.resetKey?.(ipKeyGenerator("127.0.0.1"));
+  await batasAuth.resetKey?.(ipKeyGenerator("::1"));
+  await batasAuth.resetKey?.(ipKeyGenerator("::ffff:127.0.0.1"));
 });
 
 afterAll(async () => {
@@ -181,6 +190,214 @@ describe("API autentikasi", () => {
     expect(response.body).toEqual({
       success: true,
       message: "Logout berhasil",
+    });
+  });
+
+  describe("PATCH /api/v1/auth/password (ubah password)", () => {
+    it("sukses mengubah password, login dengan password baru berhasil, login lama gagal", async () => {
+      const credentials = createTestCredentials("Tes Ubah Password Sukses");
+      emails.add(credentials.email);
+      await api.post("/api/v1/auth/register").send(credentials);
+
+      const loginRes = await api.post("/api/v1/auth/login").send(credentials);
+      const token = loginRes.body.data.accessToken as string;
+
+      const newPassword = "PasswordBaru123!";
+      const response = await api
+        .patch("/api/v1/auth/password")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          currentPassword: credentials.password,
+          newPassword,
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        success: true,
+        message: "Password berhasil diubah",
+      });
+      expect(response.body).not.toHaveProperty("passwordHash");
+      expect(JSON.stringify(response.body)).not.toMatch(/passwordHash/i);
+
+      // Login dengan password baru harus berhasil
+      const loginNewRes = await api.post("/api/v1/auth/login").send({
+        email: credentials.email,
+        password: newPassword,
+      });
+      expect(loginNewRes.status).toBe(200);
+      expect(loginNewRes.body.success).toBe(true);
+
+      // Login dengan password lama harus gagal
+      const loginOldRes = await api.post("/api/v1/auth/login").send({
+        email: credentials.email,
+        password: credentials.password,
+      });
+      expect(loginOldRes.status).toBe(401);
+    });
+
+    it("password lama salah -> 400 dan password tidak berubah", async () => {
+      const credentials = createTestCredentials("Tes Ubah Password Salah");
+      emails.add(credentials.email);
+      await api.post("/api/v1/auth/register").send(credentials);
+
+      const loginRes = await api.post("/api/v1/auth/login").send(credentials);
+      const token = loginRes.body.data.accessToken as string;
+
+      const response = await api
+        .patch("/api/v1/auth/password")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          currentPassword: "PasswordSalah123!",
+          newPassword: "PasswordBaruLain123!",
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        success: false,
+        message: "Password saat ini salah",
+        errors: [
+          {
+            field: "currentPassword",
+            message: "Password saat ini salah",
+          },
+        ],
+      });
+
+      // Password asli tetap bisa digunakan untuk login
+      const loginResCheck = await api.post("/api/v1/auth/login").send(credentials);
+      expect(loginResCheck.status).toBe(200);
+    });
+
+    it("password baru sama dengan lama -> 422", async () => {
+      const credentials = createTestCredentials("Tes Ubah Password Sama");
+      emails.add(credentials.email);
+      await api.post("/api/v1/auth/register").send(credentials);
+
+      const loginRes = await api.post("/api/v1/auth/login").send(credentials);
+      const token = loginRes.body.data.accessToken as string;
+
+      const response = await api
+        .patch("/api/v1/auth/password")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          currentPassword: credentials.password,
+          newPassword: credentials.password,
+        });
+
+      expect(response.status).toBe(422);
+      expect(response.body.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            field: "newPassword",
+            message: "Password baru harus berbeda dari password saat ini",
+          }),
+        ])
+      );
+    });
+
+    it("password baru kurang dari 8 karakter -> 422", async () => {
+      const credentials = createTestCredentials("Tes Ubah Password Pendek");
+      emails.add(credentials.email);
+      await api.post("/api/v1/auth/register").send(credentials);
+
+      const loginRes = await api.post("/api/v1/auth/login").send(credentials);
+      const token = loginRes.body.data.accessToken as string;
+
+      const response = await api
+        .patch("/api/v1/auth/password")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          currentPassword: credentials.password,
+          newPassword: "short",
+        });
+
+      expect(response.status).toBe(422);
+      expect(response.body.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            field: "newPassword",
+            message: "Password baru minimal 8 karakter",
+          }),
+        ])
+      );
+    });
+
+    it("password baru lebih dari 72 byte -> 422", async () => {
+      const account = await createTestAccount("Tes Ubah Password Panjang");
+      emails.add(account.email);
+
+      const response = await api
+        .patch("/api/v1/auth/password")
+        .set("Authorization", `Bearer ${account.token}`)
+        .send({
+          currentPassword: account.password,
+          newPassword: "é".repeat(37),
+        });
+
+      expect(response.status).toBe(422);
+      expect(response.body.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            field: "newPassword",
+            message: "Password maksimal 72 byte",
+          }),
+        ])
+      );
+    });
+
+    it("tanpa token -> 401", async () => {
+      const response = await api.patch("/api/v1/auth/password").send({
+        currentPassword: "CurrentPassword123!",
+        newPassword: "NewPassword123!",
+      });
+
+      expect(response.status).toBe(401);
+      expect(response.body.success).toBe(false);
+    });
+
+    it("pengguna A tidak bisa mengubah password pengguna B (userId selalu dari token)", async () => {
+      const userA = await createTestAccount("User A");
+      const userB = await createTestAccount("User B");
+      emails.add(userA.email);
+      emails.add(userB.email);
+
+      // User A mencoba mengirim userId user B di body
+      const response = await api
+        .patch("/api/v1/auth/password")
+        .set("Authorization", `Bearer ${userA.token}`)
+        .send({
+          userId: userB.id,
+          currentPassword: userA.password,
+          newPassword: "UserANewPass123!",
+        });
+
+      expect(response.status).toBe(200);
+
+      // Verifikasi user B tidak terpengaruh, password di DB tetap cocok dengan password B
+      const dbUserBAfter = await prisma.user.findUniqueOrThrow({
+        where: { id: userB.id },
+      });
+      const bcrypt = (await import("bcryptjs")).default;
+      expect(await bcrypt.compare(userB.password, dbUserBAfter.passwordHash)).toBe(true);
+      expect(await bcrypt.compare("UserANewPass123!", dbUserBAfter.passwordHash)).toBe(false);
+    });
+
+    it("respons tidak pernah memuat passwordHash", async () => {
+      const account = await createTestAccount("Tes Respons Hash");
+      emails.add(account.email);
+
+      const response = await api
+        .patch("/api/v1/auth/password")
+        .set("Authorization", `Bearer ${account.token}`)
+        .send({
+          currentPassword: account.password,
+          newPassword: "NewSecurePass123!",
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).not.toHaveProperty("passwordHash");
+      expect(response.body).not.toHaveProperty("password");
+      expect(JSON.stringify(response.body)).not.toMatch(/passwordHash/i);
     });
   });
 });

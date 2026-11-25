@@ -547,7 +547,6 @@ export function NotesList() {
       <div>
         <PageHeader
           title="Catatan Saya"
-          subtitle="Semua yang sudah kamu simpan, di satu tempat."
           action={
             <Link href="/notes/new" className={`${btnPrimary} hidden sm:inline-flex`}>
               <Icon name="plus" className="h-5 w-5" />

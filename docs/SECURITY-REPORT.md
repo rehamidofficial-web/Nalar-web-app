@@ -20,11 +20,12 @@ Pemeriksaan dilakukan bertahap pada aplikasi lokal. Laporan ini tidak memuat nil
 | B1 | Rute dan middleware autentikasi | LULUS untuk rute data; logout no-op publik ditunda ke Task 5.6 | Rute data memakai `requireAuth`; `POST /auth/logout` tanpa token memberi 200, tetapi tidak mengakses atau mengubah data. | Rendah — ditunda |
 | B2 | Token dengan format/tanda tangan tidak valid | LULUS untuk pengujian lokal yang dilakukan | Rute catatan lokal membalas 401 untuk token rusak atau tanda tangan salah. Token kedaluwarsa yang ditandatangani valid belum diuji dinamis. | Rendah |
 | B3 | Token mengarah ke pengguna yang tidak ada | GAGAL lalu DITUNDA ke Task 5.6 | Middleware tidak memeriksa keberadaan pengguna; `/auth/me` membalas 404. | Rendah — ditunda |
-| B4 | Hash dan paparan password | LULUS | Pendaftaran memakai bcrypt dengan cost 10; respons register, login, dan `/auth/me` tidak menyertakan hash/password. | Rendah |
+| B4 | Hash dan paparan password | LULUS | Pendaftaran dan ubah password memakai bcrypt dengan cost 10; respons register, login, `/auth/me`, dan `PATCH /auth/password` tidak menyertakan hash/password. | Rendah |
 | B5 | Kesetaraan jalur login | GAGAL lalu DIPERBAIKI | Uji router lokal terisolasi mendapat 401 dan pesan sama untuk email tidak ada/password salah; `bcrypt.compare` berjalan sekali pada tiap jalur. Benchmark waktu tidak dilakukan. | Sedang — ditangani |
 | B6 | Batas input password untuk bcrypt | GAGAL lalu DIPERBAIKI | Uji router lokal: 72 byte diterima (register 201; login 401 untuk password uji yang salah), sedangkan 75 byte ditolak 422 pada register dan login. Database tidak disentuh. | Sedang — ditangani |
 | B7 | Pembatas login | LULUS melalui inspeksi kode; belum diuji ambang 429 | Middleware memakai 10 percobaan per 15 menit dan melewati permintaan sukses. | Rendah |
 | B8 | Logout dan penyimpanan token | LULUS sebagai keputusan MVP yang diterima | Logout hanya menghapus token lokal; JWT berlaku sampai kedaluwarsa. Risiko XSS/localStorage dicatat untuk pengujian tampilan. | Rendah — diterima |
+| B9 | Endpoint ubah password (`PATCH /api/v1/auth/password`) | LULUS | Memakai `requireAuth` dan `batasAuth` (10 percobaan/15 menit untuk percobaan gagal); validasi Zod (panjang, 72 byte, password baru beda); password lama salah membalas 400 (bukan 401); update hanya untuk `req.userId`; tidak pernah membocorkan password/hash. | Rendah |
 
 ## Kelompok C — Kepemilikan data dan injeksi
 

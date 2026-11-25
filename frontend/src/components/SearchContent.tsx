@@ -193,7 +193,7 @@ export function SearchContent() {
       <div className="space-y-6">
         <PageHeader
           title="Pencarian"
-          subtitle="Cari berdasarkan makna. Kamu tidak perlu mengetik kata yang persis sama dengan catatanmu."
+          subtitle="Temukan catatan berdasarkan makna atau kata kunci."
         />
 
         <form onSubmit={handleSubmit} role="search">

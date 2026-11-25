@@ -33,9 +33,9 @@ describe("Halaman Dashboard", () => {
     vi.useRealTimers();
   });
 
-  it("menampilkan sapaan sesuai jam (sore) dan kartu statistik sukses", async () => {
+  it("menampilkan judul Your Second Brain (tanpa sapaan) dan kartu statistik sukses", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date("2026-11-23T16:00:00")); // Jam 16 sore
+    vi.setSystemTime(new Date("2026-11-23T16:00:00")); // Mengunci tanggal supaya waktu relatif ("x jam lalu") stabil
 
     vi.spyOn(api, "apiFetch").mockImplementation((url) => {
       if (url.includes("/dashboard/stats")) {
@@ -76,7 +76,10 @@ describe("Halaman Dashboard", () => {
 
     render(<DashboardPage />);
 
-    expect(screen.getByRole("heading", { name: /Selamat sore, Ahmad!/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Your Second Brain/i })).toBeInTheDocument();
+    expect(screen.getByText(/Capture ideas, connect knowledge, and think deeper\./i)).toBeInTheDocument();
+    // Sapaan "Selamat ..., nama!" sudah dihapus
+    expect(screen.queryByText(/Selamat (pagi|siang|sore|malam)/i)).not.toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText("12")).toBeInTheDocument(); // totalNotes
@@ -90,7 +93,7 @@ describe("Halaman Dashboard", () => {
         "/assistant"
       );
     });
-  });
+  }, 20000); // Diberi waktu lebih lama: render pertama di komputer yang sedang sibuk bisa lambat
 
   it("menampilkan kerangka saat data dashboard masih dimuat", () => {
     vi.spyOn(api, "apiFetch").mockImplementation(() => new Promise(() => {}));

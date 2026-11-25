@@ -32,6 +32,22 @@ const loginSchema = z.object({
     .refine(passwordWithinBcryptLimit, "Password maksimal 72 byte"),
 });
 
+const changePasswordSchema = z
+  .object({
+    currentPassword: z
+      .string()
+      .min(1, "Password saat ini wajib diisi")
+      .refine(passwordWithinBcryptLimit, "Password maksimal 72 byte"),
+    newPassword: z
+      .string()
+      .min(8, "Password baru minimal 8 karakter")
+      .refine(passwordWithinBcryptLimit, "Password maksimal 72 byte"),
+  })
+  .refine((data) => data.newPassword !== data.currentPassword, {
+    message: "Password baru harus berbeda dari password saat ini",
+    path: ["newPassword"],
+  });
+
 router.post("/register", batasAuth, async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -127,6 +143,72 @@ router.get("/me", requireAuth, async (req, res) => {
     return;
   }
   res.json({ success: true, message: "Berhasil", data: { user } });
+});
+
+router.patch("/password", requireAuth, batasAuth, async (req, res) => {
+  if (!req.userId) {
+    res.status(401).json({
+      success: false,
+      message: "Token autentikasi tidak valid atau sudah kedaluwarsa",
+      errors: [],
+    });
+    return;
+  }
+
+  const parsed = changePasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(422).json({
+      success: false,
+      message: "Data tidak valid",
+      errors: parsed.error.issues.map((i) => ({
+        field: i.path.join("."),
+        message: i.message,
+      })),
+    });
+    return;
+  }
+
+  const { currentPassword, newPassword } = parsed.data;
+
+  const user = await prisma.user.findUnique({
+    where: { id: req.userId as string },
+    select: { id: true, passwordHash: true },
+  });
+
+  if (!user) {
+    res.status(401).json({
+      success: false,
+      message: "Token tidak valid atau sudah kedaluwarsa",
+      errors: [],
+    });
+    return;
+  }
+
+  const cocok = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!cocok) {
+    res.status(400).json({
+      success: false,
+      message: "Password saat ini salah",
+      errors: [
+        {
+          field: "currentPassword",
+          message: "Password saat ini salah",
+        },
+      ],
+    });
+    return;
+  }
+
+  const newHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: newHash },
+  });
+
+  res.json({
+    success: true,
+    message: "Password berhasil diubah",
+  });
 });
 
 export default router;

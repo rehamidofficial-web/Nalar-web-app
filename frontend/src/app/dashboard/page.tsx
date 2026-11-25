@@ -27,14 +27,6 @@ interface RecentNote {
   contentPreview: string;
 }
 
-function sapaan() {
-  const jam = new Date().getHours();
-  if (jam < 11) return "Selamat pagi";
-  if (jam < 15) return "Selamat siang";
-  if (jam < 18) return "Selamat sore";
-  return "Selamat malam";
-}
-
 const AKSI_CEPAT = [
   {
     href: "/notes/new",
@@ -126,8 +118,6 @@ export default function DashboardPage() {
     );
   }
 
-  const namaDepan = user.name.trim().split(/\s+/)[0] || user.name;
-
   const kartuStat = [
     {
       href: "/notes",
@@ -155,14 +145,14 @@ export default function DashboardPage() {
   return (
     <AppShell user={user}>
       <div className="space-y-6">
-        {/* Sapaan + pencarian cepat */}
+        {/* Judul + pencarian cepat */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <h1 className="text-[28px] font-bold leading-tight tracking-tight text-slate-900 sm:text-[34px]">
-              {sapaan()}, {namaDepan}!
+              Your Second Brain
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              Ini ringkasan singkat ruang pengetahuanmu.
+              Capture ideas, connect knowledge, and think deeper.
             </p>
           </div>
           <form onSubmit={cari} className="relative w-full lg:max-w-sm" role="search">

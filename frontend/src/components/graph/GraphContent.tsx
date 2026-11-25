@@ -155,7 +155,7 @@ export function GraphContent() {
     <AppShell user={user}>
       <PageHeader
         title="Knowledge Graph"
-        subtitle="Setiap titik adalah satu catatan. Setiap garis menunjukkan dua catatan yang saling terhubung."
+        subtitle="Jelajahi hubungan antarcatatan dan konsep."
       />
 
       {errorMessage ? (

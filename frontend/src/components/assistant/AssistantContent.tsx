@@ -283,7 +283,7 @@ export function AssistantContent() {
     <AppShell user={user}>
       <PageHeader
         title="Asisten AI"
-        subtitle="Ajukan pertanyaan dan dapatkan jawaban yang hanya berdasarkan catatanmu sendiri."
+        subtitle="Temukan jawaban dari pengetahuan yang kamu simpan."
         action={
           <button
             type="button"

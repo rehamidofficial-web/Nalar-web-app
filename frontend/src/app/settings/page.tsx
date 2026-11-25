@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRequireAuth } from "@/lib/useRequireAuth";
 import { AppShell } from "@/components/AppShell";
-import { Avatar, PageHeader, cardClass, inputClass } from "@/components/ui";
+import { Avatar, Icon, PageHeader, cardClass, inputClass } from "@/components/ui";
+import { ChangePasswordDialog } from "@/components/ChangePasswordDialog";
 import { applyTheme, getTheme, type ThemeName } from "@/lib/theme";
 
 type PanjangRingkasan = "pendek" | "sedang" | "rinci";
@@ -79,6 +80,13 @@ export default function SettingsPage() {
   const [theme, setTheme] = useState<ThemeName>("light");
   const [pref, setPref] = useState<PrefAI>(PREF_AWAL);
   const [tersimpan, setTersimpan] = useState(false);
+  const [dialogPassword, setDialogPassword] = useState(false);
+  const [passwordBerhasil, setPasswordBerhasil] = useState(false);
+  const tutupDialogPassword = useCallback(() => setDialogPassword(false), []);
+  const passwordSukses = useCallback(() => {
+    setPasswordBerhasil(true);
+    window.setTimeout(() => setPasswordBerhasil(false), 5000);
+  }, []);
 
   // Baca tema aktif dan preferensi tersimpan setelah halaman tampil di browser
   useEffect(() => {
@@ -193,14 +201,24 @@ export default function SettingsPage() {
               Akun
             </h2>
             <p className="mt-1 text-sm text-slate-500">Jaga akunmu tetap aman.</p>
+            {passwordBerhasil && (
+              <div
+                role="status"
+                className="mt-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-800"
+              >
+                <Icon name="check" className="mt-0.5 h-5 w-5 shrink-0" />
+                <span>Password berhasil diubah.</span>
+              </div>
+            )}
             <div className="mt-4">
               <Baris judul="Password" isi="Pakai password panjang yang tidak kamu pakai di tempat lain.">
                 <button
                   type="button"
-                  disabled
-                  className="min-h-[44px] cursor-not-allowed rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-500 opacity-60"
+                  onClick={() => setDialogPassword(true)}
+                  aria-haspopup="dialog"
+                  className="min-h-[44px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                 >
-                  Ubah password · segera
+                  Ubah password
                 </button>
               </Baris>
               <Baris
@@ -356,6 +374,11 @@ export default function SettingsPage() {
           </section>
         </div>
       </div>
+      <ChangePasswordDialog
+        isOpen={dialogPassword}
+        onClose={tutupDialogPassword}
+        onSuccess={passwordSukses}
+      />
     </AppShell>
   );
 }
