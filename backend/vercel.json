@@ -5,7 +5,7 @@
   "functions": {
     "api/index.mjs": {
       "maxDuration": 60,
-      "includeFiles": "node_modules/.prisma/client/**"
+      "includeFiles": "{dist/**,node_modules/.prisma/client/**}"
     }
   }
 }
