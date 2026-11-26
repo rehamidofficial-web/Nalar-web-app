@@ -9,7 +9,8 @@
     "db:migrate:test": "tsx scripts/migrate-test-db.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "postinstall": "prisma generate && esbuild src/vercel.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/vercel.mjs"
   },
   "keywords": [],
   "author": "",
